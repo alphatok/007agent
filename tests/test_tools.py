@@ -44,13 +44,18 @@ class TestBuildToolkit:
         assert toolkit is not None
 
     def test_builtin_tool_count(self) -> None:
-        """Should register exactly 11 built-in tools (10 core + web_search)."""
+        """Should register exactly 12 built-in tools (10 core + web_search + context_status)."""
         from app.tools import BUILTIN_TOOLS
 
-        assert len(BUILTIN_TOOLS) == 11
+        assert len(BUILTIN_TOOLS) == 12
         expected = {
             "Bash", "Read", "Write", "Edit", "Glob", "Grep",
             "TaskCreate", "TaskGet", "TaskList", "TaskUpdate",
         }
         class_names = {t.__class__.__name__ for t in BUILTIN_TOOLS}
         assert expected.issubset(class_names)
+        # Two FunctionTool wrappers: web_search + context_status
+        function_tool_count = sum(
+            1 for t in BUILTIN_TOOLS if t.__class__.__name__ == "FunctionTool"
+        )
+        assert function_tool_count == 2

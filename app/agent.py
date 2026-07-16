@@ -3,6 +3,7 @@
 Creates a fully configured Agent instance from config and toolkit.
 """
 from agentscope.agent import Agent
+from agentscope.agent._config import ContextConfig
 from agentscope.credential import DeepSeekCredential
 from agentscope.model import DeepSeekChatModel
 from agentscope.permission import PermissionContext, PermissionMode
@@ -59,5 +60,8 @@ async def build_agent(config: Config, toolkit: Toolkit) -> Agent:
         toolkit=toolkit,
         state=AgentState(
             permission_context=PermissionContext(mode=permission_mode),
+        ),
+        context_config=ContextConfig(
+            trigger_ratio=config.compaction_trigger_ratio,
         ),
     )

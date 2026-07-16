@@ -25,6 +25,7 @@ from agentscope.tool import (
     Write,
 )
 
+from app.compaction import get_tools as get_compaction_tools
 from app.config import Config
 from app.search import web_search
 from skills import discover_skills
@@ -42,6 +43,7 @@ BUILTIN_TOOLS = [
     TaskList(),
     TaskUpdate(),
     FunctionTool(web_search),
+    *get_compaction_tools(),
 ]
 
 

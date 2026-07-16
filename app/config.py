@@ -29,6 +29,12 @@ class Config:
     chrome_mcp_enabled: bool = True
     """Whether to enable Chrome DevTools MCP integration."""
 
+    compaction_trigger_ratio: float = 0.4
+    """Context compaction trigger ratio (0.4 = 40% of 128K = 51.2K tokens)."""
+
+    compaction_warning_tokens: int = 20000
+    """Token threshold for context warning level."""
+
 
 def load_config() -> Config:
     """Load configuration from environment variables.
@@ -45,4 +51,10 @@ def load_config() -> Config:
         permission_mode=os.getenv("PERMISSION_MODE", "bypass"),
         chrome_mcp_enabled=os.getenv("CHROME_MCP_ENABLED", "true").lower()
         == "true",
+        compaction_trigger_ratio=float(
+            os.getenv("COMPACTION_TRIGGER_RATIO", "0.4"),
+        ),
+        compaction_warning_tokens=int(
+            os.getenv("COMPACTION_WARNING_TOKENS", "20000"),
+        ),
     )

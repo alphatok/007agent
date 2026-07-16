@@ -301,9 +301,21 @@ def create_app(
             )
 
         async def generate():
+            _last_summary: str | None = agent.state.summary
             async for evt in agent.reply_stream(
                 UserMsg("user", content),
             ):
+                # Detect context compaction
+                current_summary = agent.state.summary
+                if current_summary != _last_summary:
+                    _last_summary = current_summary
+                    if current_summary:
+                        yield _sse({
+                            "type": "compaction",
+                            "status": "completed",
+                            "summary": "Context compressed",
+                        })
+
                 if evt.type == EventType.TEXT_BLOCK_DELTA and evt.delta:
                     yield _sse({"type": "text", "text": evt.delta})
                 elif evt.type == EventType.TOOL_CALL_START:

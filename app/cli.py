@@ -53,8 +53,19 @@ async def _stream_reply(agent: Agent, user_input: str) -> None:
     """
     tool_names: dict[str, str] = {}
     tool_result_lines: dict[str, int] = {}
+    _last_summary: str | None = agent.state.summary
 
     async for evt in agent.reply_stream(UserMsg("user", user_input)):
+        # Detect context compaction
+        current_summary = agent.state.summary
+        if current_summary != _last_summary:
+            _last_summary = current_summary
+            if current_summary:
+                print(
+                    "\n  [Compaction] Context compressed, summary updated",
+                    flush=True,
+                )
+
         match evt.type:
             case EventType.REPLY_START:
                 print("Agent: ", end="", flush=True)
