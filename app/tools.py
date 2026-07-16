@@ -28,6 +28,7 @@ from agentscope.tool import (
 from app.compaction import get_tools as get_compaction_tools
 from app.config import Config
 from app.search import web_search
+from app.subagent import get_tools as get_subagent_tools
 from skills import discover_skills
 
 # All built-in tools available to the agent
@@ -44,6 +45,7 @@ BUILTIN_TOOLS = [
     TaskUpdate(),
     FunctionTool(web_search),
     *get_compaction_tools(),
+    *get_subagent_tools(),
 ]
 
 

@@ -18,6 +18,8 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from agentscope.event import EventType
 from agentscope.message import UserMsg
 
+from app.task_manager import TaskManager
+
 if TYPE_CHECKING:
     from agentscope.agent import Agent
 
@@ -219,6 +221,7 @@ async function send(){
 
 def create_app(
     agent: "Agent",
+    task_manager: TaskManager | None = None,
     workspace_root: Path | None = None,
 ) -> FastAPI:
     """Create a FastAPI app that wraps the Agent.
@@ -348,6 +351,76 @@ def create_app(
             media_type="text/event-stream",
         )
 
+    # --- Async Tasks ---
+
+    @app.post("/api/tasks")
+    async def submit_task(request: dict) -> dict:
+        """Submit an async task. Returns task_id immediately."""
+        if not task_manager:
+            raise HTTPException(
+                status_code=501,
+                detail="Task manager not configured",
+            )
+        content = request.get("content", "")
+        if not content:
+            raise HTTPException(status_code=400, detail="content is required")
+        subagent = request.get("subagent")
+        task = task_manager.create(content=content, subagent=subagent)
+        task_manager.start_execute(task, agent)
+        return {
+            "task_id": task.task_id,
+            "status": task.status,
+            "created_at": task.created_at,
+            "status_url": f"/api/tasks/{task.task_id}",
+        }
+
+    @app.get("/api/tasks/{task_id}")
+    async def get_task(task_id: str) -> dict:
+        """Get task status and result by ID."""
+        if not task_manager:
+            raise HTTPException(
+                status_code=501,
+                detail="Task manager not configured",
+            )
+        task = task_manager.get(task_id)
+        if task is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task '{task_id}' not found",
+            )
+        from dataclasses import asdict
+        return asdict(task)
+
+    @app.get("/api/tasks")
+    async def list_tasks() -> list[dict]:
+        """List all tasks, newest first."""
+        if not task_manager:
+            raise HTTPException(
+                status_code=501,
+                detail="Task manager not configured",
+            )
+        from dataclasses import asdict
+        return [asdict(t) for t in task_manager.list_all()]
+
+    @app.delete("/api/tasks/{task_id}")
+    async def cancel_task(task_id: str) -> dict:
+        """Cancel or delete a task."""
+        if not task_manager:
+            raise HTTPException(
+                status_code=501,
+                detail="Task manager not configured",
+            )
+        task = task_manager.get(task_id)
+        if task is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task '{task_id}' not found",
+            )
+        if task.status in ("running", "pending"):
+            task_manager.update(task_id, status="cancelled")
+        task_manager.delete(task_id)
+        return {"task_id": task_id, "status": "cancelled"}
+
     return app
 
 
@@ -375,7 +448,8 @@ def main() -> None:
         config = load_config()
         toolkit = await build_toolkit(config)
         agent = await build_agent(config, toolkit)
-        app = create_app(agent)
+        tm = TaskManager()
+        app = create_app(agent, task_manager=tm)
         uvicorn_config = uvicorn.Config(app, host="0.0.0.0", port=8000)
         server = uvicorn.Server(uvicorn_config)
         await server.serve()

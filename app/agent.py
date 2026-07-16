@@ -11,6 +11,7 @@ from agentscope.state import AgentState
 from agentscope.tool import Toolkit
 
 from app.config import Config
+from app.subagent import SubagentLoader, SubagentRunner, set_subagent_runner
 
 SYSTEM_PROMPT = (
     "You are a helpful AI assistant powered by DeepSeek V4 Pro. "
@@ -39,6 +40,11 @@ async def build_agent(config: Config, toolkit: Toolkit) -> Agent:
         An Agent instance ready for use.
     """
     permission_mode = PermissionMode(config.permission_mode)
+
+    # Initialize Subagent system for delegate_subagent tool
+    loader = SubagentLoader()
+    runner = SubagentRunner(config, loader)
+    set_subagent_runner(runner)
 
     # Inject skill instructions into system prompt
     skill_instructions = await toolkit.get_skill_instructions()
