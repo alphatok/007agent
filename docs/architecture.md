@@ -5,29 +5,38 @@
 An AI Agent application powered by DeepSeek V4 Pro, supporting both CLI and
 Web UI (AgentScope Studio) interaction modes with a shared agent core.
 
+Features:
+- 13 built-in tools + Chrome DevTools MCP
+- Web search via DuckDuckGo
+- Dual-layer Skill system (Tool + Instruction)
+- Context compaction (auto-triggered at 40% of context window)
+- Subagent delegation (Claude Code-style AGENT.md configs)
+- Async task HTTP API (submit → poll status)
+
 ## 2. Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      Entry Points                        │
-│  ┌──────────┐  ┌──────────────────────────────────────┐ │
-│  │  CLI     │  │  Agent Service (FastAPI + Web UI)    │ │
-│  │  Mode    │  │  POST /chat  │  SSE /stream          │ │
-│  └────┬─────┘  └──────────────────┬───────────────────┘ │
-│       │                            │                     │
-│       └──────────┬─────────────────┘                     │
-│                  ▼                                       │
-│  ┌──────────────────────────────┐                        │
-│  │       Agent Factory          │  build_agent()         │
-│  │  - Model + Credential        │                        │
-│  │  - Tools + MCP               │                        │
-│  └──────────────┬───────────────┘                        │
-│                 ▼                                        │
-│  ┌──────────────────────────────┐                        │
-│  │         AgentScope           │  Framework             │
-│  │  Agent | Toolkit | Event     │                        │
-│  └──────────────────────────────┘                        │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                        Entry Points                              │
+│  ┌──────────┐  ┌─────────────────────────────────────────────┐  │
+│  │  CLI     │  │  Agent Service (FastAPI + Web UI)           │  │
+│  │  Mode    │  │  POST /chat  │  SSE /stream  │  /api/tasks  │  │
+│  └────┬─────┘  └──────────────────┬──────────────────────────┘  │
+│       │                            │                              │
+│       └──────────┬─────────────────┘                              │
+│                  ▼                                                │
+│  ┌──────────────────────────────────────┐                        │
+│  │         Agent Factory                │  build_agent()          │
+│  │  - Model + Credential                │                        │
+│  │  - Tools + MCP + Skills + Subagents  │                        │
+│  │  - ContextConfig (compaction)        │                        │
+│  └──────────────┬───────────────────────┘                        │
+│                 ▼                                                 │
+│  ┌──────────────────────────────────────┐                        │
+│  │           AgentScope                 │  Framework              │
+│  │  Agent | Toolkit | Event | Summary   │                        │
+│  └──────────────────────────────────────┘                        │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## 3. Module Design
@@ -36,11 +45,20 @@ Web UI (AgentScope Studio) interaction modes with a shared agent core.
 app/
 ├── __init__.py
 ├── config.py          # Config: load .env, typed settings
-├── tools.py           # Tools:  register all built-in + MCP tools
+├── tools.py           # Tools:  register all built-in + MCP + skills + subagents
 ├── search.py          # Search: DuckDuckGo web search tool
-├── agent.py           # Agent:  build_agent() factory
-├── cli.py             # CLI:    interactive terminal loop
-└── service.py         # Service: FastAPI app for Studio mode
+├── compaction.py      # Compaction: context_status tool + monitoring
+├── task_manager.py    # Tasks: async task CRUD + background execution
+├── subagent.py        # Subagent: loader, runner, delegate_subagent tool
+├── agent.py           # Agent:  build_agent() factory (async)
+├── cli.py             # CLI:    interactive terminal loop + compaction detection
+└── service.py         # Service: FastAPI REST + SSE + Web UI + Task API
+
+subagents/             # Subagent configs (AGENT.md format)
+├── code-reviewer/
+│   └── AGENT.md
+└── test-generator/
+    └── AGENT.md
 
 skills/                # Skill system (双层体系)
 ├── __init__.py        # discover_skills() - Tool Skill 发现
@@ -57,32 +75,39 @@ skills/                # Skill system (双层体系)
 | Module | Responsibility | Dependencies |
 |--------|---------------|--------------|
 | `config.py` | Load .env, provide typed config | `python-dotenv` |
-| `tools.py` | Build Toolkit with built-in + MCP + skills | `agentscope.tool`, `agentscope.mcp`, `skills` |
+| `tools.py` | Build Toolkit with built-in + MCP + skills + subagents | `agentscope`, `skills`, `compaction`, `subagent` |
 | `search.py` | DuckDuckGo web search tool | `duckduckgo-search` |
-| `agent.py` | Create Agent instance from config + tools | `config`, `tools` |
-| `cli.py` | Interactive CLI loop with event streaming | `agent` |
-| `service.py` | FastAPI app with REST + SSE + Web UI | `agent` |
+| `compaction.py` | `context_status` tool, compaction monitoring | `agentscope` |
+| `task_manager.py` | Async task CRUD, background execution, `.trae/tasks/` persistence | `asyncio`, `json` |
+| `subagent.py` | Subagent loader, runner, `delegate_subagent` tool | `agentscope`, `yaml` |
+| `agent.py` | Create Agent from config + toolkit (async, with ContextConfig) | `config`, `tools`, `subagent` |
+| `cli.py` | Interactive CLI loop with event streaming + compaction detection | `agent` |
+| `service.py` | FastAPI app with REST + SSE + Web UI + Task API | `agent`, `task_manager` |
 
 ### 3.2 Dependency Flow
 
 ```
-config.py           (no deps)
+config.py                     (no deps)
+    │
+    ├──► compaction.py  ◄──── config.py
+    ├──► subagent.py    ◄──── config.py
+    ├──► task_manager.py
     │
     ▼
-tools.py  ◄──────── config.py, skills/, search.py
+tools.py  ◄──────── config.py, skills/, search.py, compaction.py, subagent.py
     │
     ▼
-agent.py  ◄──────── config.py, tools.py
+agent.py  ◄──────── config.py, tools.py, subagent.py
     │
     ├──► cli.py      (imports agent)
-    └──► service.py  (imports agent)
+    └──► service.py  (imports agent, task_manager)
 ```
 
 ### 3.3 Design Principles
 
 - **High Cohesion**: Each module has one clear responsibility
 - **Low Coupling**: Modules depend only on what they need, via interfaces
-- **Extensible**: Add new tools in `tools.py`, new skills in `skills/`, new modes as new entry points
+- **Extensible**: Add new tools in `tools.py`, new skills in `skills/`, new subagents in `subagents/`, new modes as new entry points
 - **Not Over-Engineered**: No abstract base classes without need
 
 ### 3.4 Skill System
@@ -107,6 +132,67 @@ agent.py  ◄──────── config.py, tools.py
 - 渐进式披露：主文件导航，细节放 references/
 - 一级引用深度，正斜杠路径
 
+### 3.5 Subagent System
+
+参考 Anthropic Claude Code 的 Subagent 机制，支持将任务委派给独立的专用 Agent 实例。
+
+**配置格式**（`subagents/name/AGENT.md`）：
+```yaml
+---
+name: code-reviewer
+description: 审查代码变更，检查代码质量、安全性...
+tools: Read, Grep, Glob, Bash
+model: deepseek-v4-pro
+---
+（Markdown 系统提示词）
+```
+
+**关键设计**：
+- 独立上下文：每个 Subagent 使用新的 AgentState
+- 工具白名单：只授予 AGENT.md 中声明的工具
+- 无 MCP/Skills：保持上下文干净
+- 结果回传：只返回最终结果，不返回中间过程
+
+**架构**：
+```
+SubagentLoader  →  SubagentConfig  →  SubagentRunner  →  Agent 实例
+       ↑                                              ↓
+  subagents/name/AGENT.md                    delegate_subagent (FunctionTool)
+                                                     ↓
+                                          Agent 内部调用 / Task API 外部调用
+```
+
+### 3.6 Context Compaction
+
+AgentScope 2.0 内置 `compress_context()` 自动在每次 reasoning 前检测 token 使用量，超过阈值时触发结构化压缩。
+
+**配置**：
+- `trigger_ratio = 0.4`（40% of 128K = 51.2K tokens）
+- `warning_tokens = 20000`（警告阈值）
+
+**压缩摘要结构**：
+- `task_overview` — 用户核心请求和成功标准
+- `current_state` — 已完成的工作、文件变更
+- `important_discoveries` — 技术约束、决策、错误修复
+- `next_steps` — 待完成的具体行动
+- `context_to_preserve` — 用户偏好、承诺
+
+**流式可见性**：CLI 输出 `[Compaction] Context compressed, summary updated`，SSE 发送 `compaction` 事件。
+
+### 3.7 Async Task API
+
+通过 HTTP 提交异步任务，任务存储在 `.trae/tasks/` 目录，支持轮询状态。
+
+**状态机**：`pending → running → completed/failed/cancelled`
+
+**端点**：
+```
+POST   /api/tasks            → 提交任务
+GET    /api/tasks/{task_id}  → 查询状态
+GET    /api/tasks             → 列出所有
+DELETE /api/tasks/{task_id}  → 取消任务
+```
+
 ## 4. Key Interfaces
 
 ### 4.1 config.py
@@ -118,6 +204,8 @@ class Config:
     deepseek_base_url: str       # default: "https://api.deepseek.com"
     permission_mode: str         # default: "bypass"
     chrome_mcp_enabled: bool     # default: True
+    compaction_trigger_ratio: float  # default: 0.4
+    compaction_warning_tokens: int   # default: 20000
 
 def load_config() -> Config: ...
 ```
@@ -126,38 +214,67 @@ def load_config() -> Config: ...
 
 ```python
 async def build_toolkit(config: Config) -> Toolkit: ...
-# Returns Toolkit with built-in tools + optional Chrome DevTools MCP
+# Returns Toolkit with 13 built-in tools + optional MCP + skills + subagents
 ```
 
 ### 4.3 agent.py
 
 ```python
-def build_agent(config: Config, toolkit: Toolkit) -> Agent: ...
-# Returns fully configured Agent instance
+async def build_agent(config: Config, toolkit: Toolkit) -> Agent: ...
+# Returns fully configured Agent with ContextConfig + SubagentRunner
 ```
 
 ### 4.4 cli.py
 
 ```python
 async def run_cli(agent: Agent) -> None: ...
-# Interactive loop with event streaming display
+# Interactive loop with event streaming + compaction detection
 ```
 
 ### 4.5 service.py
 
 ```python
-def create_app(agent: Agent) -> FastAPI: ...
-# Returns FastAPI app with /chat and /stream endpoints
+def create_app(agent: Agent, task_manager: TaskManager | None = None) -> FastAPI: ...
+# Returns FastAPI app with /chat, /stream, /api/files/*, /api/tasks/* endpoints
+```
+
+### 4.6 task_manager.py
+
+```python
+class TaskManager:
+    def create(content: str, subagent: str | None = None) -> TaskRecord: ...
+    def get(task_id: str) -> TaskRecord | None: ...
+    def list_all() -> list[TaskRecord]: ...
+    def update(task_id: str, **kwargs) -> TaskRecord | None: ...
+    def delete(task_id: str) -> bool: ...
+    async def execute(task: TaskRecord, agent: Agent) -> None: ...
+    def start_execute(task: TaskRecord, agent: Agent) -> None: ...
+```
+
+### 4.7 subagent.py
+
+```python
+class SubagentLoader:
+    def load(name: str) -> SubagentConfig | None: ...
+    def list_all() -> dict[str, SubagentConfig]: ...
+
+class SubagentRunner:
+    async def run(subagent_name: str, task: str, context: str | None = None) -> str: ...
+
+async def delegate_subagent(subagent_name: str, task: str, context: str | None = None) -> AsyncGenerator[ToolChunk, None]: ...
 ```
 
 ## 5. Entry Points
 
-- `python -m app.cli` — CLI mode (current behavior)
-- `python -m app.service` — Agent Service mode (Studio-ready)
+- `uv run main.py` — CLI mode
+- `uv run python -m app.service` — Agent Service mode (HTTP API on :8000)
+- `uv run pytest tests/ -v` — 58 unit tests
 
 ## 6. Extension Points
 
-1. **New Tool**: Add to `tools.py` → `build_toolkit()`
-2. **New MCP**: Add to `tools.py` → `build_toolkit()`
-3. **New Model**: Update `config.py` + `agent.py`
-4. **New Entry Mode**: Create `app/new_mode.py`, import `build_agent()`
+1. **New Tool** → Add to `tools.py` → `BUILTIN_TOOLS`
+2. **New Skill** → Create `.py` in `skills/` or `SKILL.md` in `skills/*/`
+3. **New Subagent** → Create `subagents/name/AGENT.md`
+4. **New MCP** → Add to `tools.py` → `build_toolkit()`
+5. **New Model** → Update `config.py` + `agent.py`
+6. **New Entry Mode** → Create `app/new_mode.py`, import `build_agent()`
