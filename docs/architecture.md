@@ -42,10 +42,14 @@ app/
 ├── cli.py             # CLI:    interactive terminal loop
 └── service.py         # Service: FastAPI app for Studio mode
 
-skills/                # Skill system (auto-discovered)
-├── __init__.py        # discover_skills() loader
-├── anthropic_skill.py # Anthropic Claude API integration
-└── openai_skill.py    # OpenAI GPT API integration
+skills/                # Skill system (双层体系)
+├── __init__.py        # discover_skills() - Tool Skill 发现
+├── anthropic_skill.py # [Tool Skill] Anthropic Claude API 工具
+├── openai_skill.py    # [Tool Skill] OpenAI GPT API 工具
+├── code-review/       # [Instruction Skill] 代码审查
+│   └── SKILL.md
+└── test-generation/   # [Instruction Skill] 测试生成
+    └── SKILL.md
 ```
 
 ### 3.1 Module Responsibilities
@@ -83,17 +87,25 @@ agent.py  ◄──────── config.py, tools.py
 
 ### 3.4 Skill System
 
-Skills are auto-discovered Python modules. Each skill:
-- Lives in `skills/` as a `.py` file
-- Exports a `get_tools() -> list[FunctionTool]` function
-- Each tool is an async generator yielding `ToolChunk` with `[TextBlock(text=...)]` content
-- Uses `ToolResultState.SUCCESS` / `ToolResultState.ERROR` for final state
+采用**双层 Skill 体系**，兼顾 AgentScope 原生 Skill 协议和项目扩展需求：
 
-**Best practices:**
-- Each tool function has a single responsibility
-- Clear docstrings with Args/Returns
-- Proper error handling with ToolResultState.ERROR
-- API keys loaded from environment variables
+**Layer 1: Tool Skill（工具型技能）**
+- Python 模块，导出 `get_tools() -> list[FunctionTool]`
+- 为 Agent 提供新的工具能力（如调用 Anthropic/OpenAI API）
+- 通过 `discover_skills()` 自动发现，注册到 `Toolkit.tools`
+
+**Layer 2: Instruction Skill（指令型技能）**
+- 目录 + SKILL.md 文件，含 YAML frontmatter + Markdown 指令
+- 教 Agent 如何使用已有工具完成特定领域任务
+- 通过 `LocalSkillLoader` 加载，Agent 通过 `Skill` 工具读取
+- 遵循 AgentScope 原生 Skill 协议
+
+**最佳实践:**
+- SKILL.md 主体 ≤500 行，简洁至上
+- Frontmatter: name（1-64字符小写+连字符），description（第三人称，含触发词+反向触发词）
+- 分步骤编号，第三人称祈使语气
+- 渐进式披露：主文件导航，细节放 references/
+- 一级引用深度，正斜杠路径
 
 ## 4. Key Interfaces
 

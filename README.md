@@ -56,10 +56,14 @@ AGENTS/
 │   ├── cli.py                 # Interactive CLI loop
 │   └── service.py             # FastAPI REST + SSE + Web UI
 │
-├── skills/                    # Skill system (auto-discovered)
-│   ├── __init__.py            # discover_skills() loader
-│   ├── anthropic_skill.py     # Anthropic Claude API tools
-│   └── openai_skill.py        # OpenAI GPT API tools
+├── skills/                    # 双层 Skill 体系
+│   ├── __init__.py            # discover_skills() - Tool Skill 发现
+│   ├── anthropic_skill.py     # [Tool Skill] Claude API 工具
+│   ├── openai_skill.py        # [Tool Skill] GPT API 工具
+│   ├── code-review/           # [Instruction Skill] 代码审查
+│   │   └── SKILL.md
+│   └── test-generation/       # [Instruction Skill] 测试生成
+│       └── SKILL.md
 │
 └── tests/                     # All tests
     ├── test_config.py
@@ -129,21 +133,46 @@ All settings via `.env`:
 
 ## Skill System
 
-Skills are auto-discovered Python modules in the `skills/` directory. Each skill exports a `get_tools()` function returning a list of `FunctionTool` instances.
+采用**双层 Skill 体系**，遵循 AgentScope 原生 Skill 协议：
 
-### Available Skills
+### Layer 1: Tool Skill（工具型技能）
+
+Python 模块通过 `get_tools()` 导出 `FunctionTool`，为 Agent 提供新的工具能力。
 
 | Skill | Tools | Requires |
 |-------|-------|----------|
 | `anthropic_skill` | `anthropic_chat` — Send messages to Claude | `ANTHROPIC_API_KEY` |
 | `openai_skill` | `openai_chat` — Send messages to GPT | `OPENAI_API_KEY` |
 
-### Adding a New Skill
+### Layer 2: Instruction Skill（指令型技能）
 
-1. Create a new `.py` file in `skills/`
-2. Define a `get_tools() -> list[FunctionTool]` function
-3. Each tool is an async generator yielding `ToolChunk` with `[TextBlock(text=...)]` content
-4. Restart — the skill is auto-discovered on startup
+`SKILL.md` 文件（YAML frontmatter + Markdown 指令），教 Agent 如何用已有工具完成特定任务。Agent 通过内置 `Skill` 工具读取。
+
+| Skill | 描述 |
+|-------|------|
+| `code-review` | 系统性代码审查：检查质量、安全、性能、可维护性 |
+| `test-generation` | 生成高质量 pytest 单元测试，遵循 AAA 模式 |
+
+### 工作流程
+
+```
+1. 启动时 → LocalSkillLoader 扫描 SKILL.md → 解析 frontmatter
+2. 对话时 → 系统提示词注入 Skill 列表（name + description）
+3. Agent 判断需要 → 调用 Skill("code-review") 工具
+4. 返回 SKILL.md 完整指令 → Agent 按指令执行
+```
+
+### 添加新 Skill
+
+**Tool Skill:**
+1. 创建 `skills/your_skill.py`
+2. 定义 `get_tools() -> list[FunctionTool]`
+3. 重启，自动发现
+
+**Instruction Skill:**
+1. 创建 `skills/your-skill/SKILL.md`
+2. 编写 YAML frontmatter + Markdown 指令（≤500行）
+3. 重启，自动加载
 
 ## MCP Integration
 

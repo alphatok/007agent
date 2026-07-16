@@ -362,7 +362,7 @@ def main() -> None:
     async def _run() -> None:
         config = load_config()
         toolkit = await build_toolkit(config)
-        agent = build_agent(config, toolkit)
+        agent = await build_agent(config, toolkit)
         app = create_app(agent)
         uvicorn_config = uvicorn.Config(app, host="0.0.0.0", port=8000)
         server = uvicorn.Server(uvicorn_config)

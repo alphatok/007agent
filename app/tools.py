@@ -2,9 +2,14 @@
 
 Provides all built-in tools, search capability, skill system, and optional
 Chrome DevTools MCP integration.
+
+Skill system has two layers:
+  - Tool Skills: Python modules in skills/ with get_tools() (auto-discovered)
+  - Instruction Skills: SKILL.md files in skills/*/ (loaded via LocalSkillLoader)
 """
 from agentscope.mcp import MCPClient
 from agentscope.mcp._config import StdioMCPConfig
+from agentscope.skill import LocalSkillLoader
 from agentscope.tool import (
     Bash,
     Edit,
@@ -49,10 +54,10 @@ async def build_toolkit(config: Config) -> Toolkit:
     Returns:
         Configured Toolkit instance ready for agent use.
     """
-    # Discover skill tools
+    # Discover Tool Skills (Python modules with get_tools())
     skill_tools = discover_skills()
 
-    # Combine all tools: built-in + skills
+    # Combine all tools: built-in + Tool Skills
     all_tools = list(BUILTIN_TOOLS) + skill_tools
 
     mcps = []
@@ -68,7 +73,11 @@ async def build_toolkit(config: Config) -> Toolkit:
         await mcp.connect()
         mcps.append(mcp)
 
+    # Instruction Skills: load SKILL.md files from skills/ subdirectories
+    skill_loader = LocalSkillLoader(directory="skills/", scan_subdir=True)
+
     return Toolkit(
         tools=all_tools,
+        skills_or_loaders=[skill_loader],
         mcps=mcps if mcps else None,
     )

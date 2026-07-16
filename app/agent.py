@@ -14,32 +14,40 @@ from app.config import Config
 SYSTEM_PROMPT = (
     "You are a helpful AI assistant powered by DeepSeek V4 Pro. "
     "You have access to a wide range of tools including file operations, "
-    "shell commands, code search, task management, and Chrome browser "
-    "control via Chrome DevTools. "
+    "shell commands, code search, task management, web search, and Chrome "
+    "browser control via Chrome DevTools. "
     "Use these tools effectively to help the user accomplish their goals. "
     "When working on complex tasks, use the task management tools "
     "(TaskCreate, TaskGet, TaskList, TaskUpdate) to plan and track "
     "your progress. "
-    "Use Chrome DevTools tools to navigate web pages, take screenshots, "
-    "debug performance issues, and automate browser interactions."
+    "You also have access to Skills - specialized instructions for "
+    "specific tasks like code review and test generation. "
+    "When a task matches a skill's description, use the Skill tool to "
+    "read the full instructions and follow them precisely."
 )
 
 
-def build_agent(config: Config, toolkit: Toolkit) -> Agent:
+async def build_agent(config: Config, toolkit: Toolkit) -> Agent:
     """Build a fully configured Agent instance.
 
     Args:
         config: Application configuration with API keys and settings.
-        toolkit: Configured Toolkit with tools and MCP clients.
+        toolkit: Configured Toolkit with tools, skills, and MCP clients.
 
     Returns:
         An Agent instance ready for use.
     """
     permission_mode = PermissionMode(config.permission_mode)
 
+    # Inject skill instructions into system prompt
+    skill_instructions = await toolkit.get_skill_instructions()
+    system_prompt = SYSTEM_PROMPT
+    if skill_instructions:
+        system_prompt = SYSTEM_PROMPT + "\n\n" + skill_instructions
+
     return Agent(
         name="AgentScope",
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=system_prompt,
         model=DeepSeekChatModel(
             credential=DeepSeekCredential(
                 api_key=config.deepseek_api_key,

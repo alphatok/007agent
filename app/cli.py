@@ -117,7 +117,7 @@ def main() -> None:
     async def _run() -> None:
         config = load_config()
         toolkit = await build_toolkit(config)
-        agent = build_agent(config, toolkit)
+        agent = await build_agent(config, toolkit)
         await run_cli(agent)
 
     asyncio.run(_run())
