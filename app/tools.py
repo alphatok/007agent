@@ -1,12 +1,14 @@
 """Tool registration module.
 
-Provides all built-in tools and optional Chrome DevTools MCP integration.
+Provides all built-in tools, search capability, skill system, and optional
+Chrome DevTools MCP integration.
 """
 from agentscope.mcp import MCPClient
 from agentscope.mcp._config import StdioMCPConfig
 from agentscope.tool import (
     Bash,
     Edit,
+    FunctionTool,
     Glob,
     Grep,
     Read,
@@ -19,6 +21,8 @@ from agentscope.tool import (
 )
 
 from app.config import Config
+from app.search import web_search
+from skills import discover_skills
 
 # All built-in tools available to the agent
 BUILTIN_TOOLS = [
@@ -32,11 +36,12 @@ BUILTIN_TOOLS = [
     TaskGet(),
     TaskList(),
     TaskUpdate(),
+    FunctionTool(web_search),
 ]
 
 
 async def build_toolkit(config: Config) -> Toolkit:
-    """Build a Toolkit with all built-in tools and optional MCP clients.
+    """Build a Toolkit with all tools and optional MCP clients.
 
     Args:
         config: Application configuration.
@@ -44,6 +49,12 @@ async def build_toolkit(config: Config) -> Toolkit:
     Returns:
         Configured Toolkit instance ready for agent use.
     """
+    # Discover skill tools
+    skill_tools = discover_skills()
+
+    # Combine all tools: built-in + skills
+    all_tools = list(BUILTIN_TOOLS) + skill_tools
+
     mcps = []
     if config.chrome_mcp_enabled:
         mcp = MCPClient(
@@ -58,6 +69,6 @@ async def build_toolkit(config: Config) -> Toolkit:
         mcps.append(mcp)
 
     return Toolkit(
-        tools=BUILTIN_TOOLS,
+        tools=all_tools,
         mcps=mcps if mcps else None,
     )

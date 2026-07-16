@@ -37,9 +37,15 @@ app/
 ├── __init__.py
 ├── config.py          # Config: load .env, typed settings
 ├── tools.py           # Tools:  register all built-in + MCP tools
+├── search.py          # Search: DuckDuckGo web search tool
 ├── agent.py           # Agent:  build_agent() factory
 ├── cli.py             # CLI:    interactive terminal loop
 └── service.py         # Service: FastAPI app for Studio mode
+
+skills/                # Skill system (auto-discovered)
+├── __init__.py        # discover_skills() loader
+├── anthropic_skill.py # Anthropic Claude API integration
+└── openai_skill.py    # OpenAI GPT API integration
 ```
 
 ### 3.1 Module Responsibilities
@@ -47,10 +53,11 @@ app/
 | Module | Responsibility | Dependencies |
 |--------|---------------|--------------|
 | `config.py` | Load .env, provide typed config | `python-dotenv` |
-| `tools.py` | Build Toolkit with built-in + MCP tools | `agentscope.tool`, `agentscope.mcp` |
+| `tools.py` | Build Toolkit with built-in + MCP + skills | `agentscope.tool`, `agentscope.mcp`, `skills` |
+| `search.py` | DuckDuckGo web search tool | `duckduckgo-search` |
 | `agent.py` | Create Agent instance from config + tools | `config`, `tools` |
 | `cli.py` | Interactive CLI loop with event streaming | `agent` |
-| `service.py` | FastAPI app with REST + SSE endpoints | `agent` |
+| `service.py` | FastAPI app with REST + SSE + Web UI | `agent` |
 
 ### 3.2 Dependency Flow
 
@@ -58,7 +65,7 @@ app/
 config.py           (no deps)
     │
     ▼
-tools.py  ◄──────── config.py
+tools.py  ◄──────── config.py, skills/, search.py
     │
     ▼
 agent.py  ◄──────── config.py, tools.py
@@ -71,8 +78,22 @@ agent.py  ◄──────── config.py, tools.py
 
 - **High Cohesion**: Each module has one clear responsibility
 - **Low Coupling**: Modules depend only on what they need, via interfaces
-- **Extensible**: Add new tools in `tools.py`, new modes as new entry points
-- **Not Over-Engineered**: 6 modules, no abstract base classes without need
+- **Extensible**: Add new tools in `tools.py`, new skills in `skills/`, new modes as new entry points
+- **Not Over-Engineered**: No abstract base classes without need
+
+### 3.4 Skill System
+
+Skills are auto-discovered Python modules. Each skill:
+- Lives in `skills/` as a `.py` file
+- Exports a `get_tools() -> list[FunctionTool]` function
+- Each tool is an async generator yielding `ToolChunk` with `[TextBlock(text=...)]` content
+- Uses `ToolResultState.SUCCESS` / `ToolResultState.ERROR` for final state
+
+**Best practices:**
+- Each tool function has a single responsibility
+- Clear docstrings with Args/Returns
+- Proper error handling with ToolResultState.ERROR
+- API keys loaded from environment variables
 
 ## 4. Key Interfaces
 
