@@ -22,6 +22,8 @@ from app.task_manager import TaskManager
 
 if TYPE_CHECKING:
     from agentscope.agent import Agent
+    from app.store import SessionStore
+    from app.memory import MemoryStore
 
 # Workspace root for file downloads
 WORKSPACE_ROOT = Path.cwd()
@@ -223,12 +225,17 @@ def create_app(
     agent: "Agent",
     task_manager: TaskManager | None = None,
     workspace_root: Path | None = None,
+    store: "SessionStore | None" = None,
+    memory: "MemoryStore | None" = None,
 ) -> FastAPI:
     """Create a FastAPI app that wraps the Agent.
 
     Args:
         agent: Configured Agent instance.
+        task_manager: Optional TaskManager for async task API.
         workspace_root: Root directory for file downloads. Defaults to CWD.
+        store: Optional SessionStore for session persistence.
+        memory: Optional MemoryStore for cross-session memory.
 
     Returns:
         FastAPI application with web UI, chat, and file download endpoints.
@@ -421,6 +428,119 @@ def create_app(
         task_manager.delete(task_id)
         return {"task_id": task_id, "status": "cancelled"}
 
+    # ---- Session API ----
+
+    @app.get("/api/sessions")
+    async def list_sessions(limit: int = Query(50, ge=1, le=200)):
+        """List all sessions."""
+        if not store:
+            return []
+        return store.list_sessions(limit=limit)
+
+    @app.post("/api/sessions")
+    async def create_session(
+        name: str = Query("", description="Session name"),
+    ):
+        """Create a new session."""
+        if not store:
+            raise HTTPException(status_code=501, detail="Store not configured")
+        session_id = store.create_session(name=name or None)
+        session = store.get_session(session_id)
+        return {"session_id": session_id, "session": session}
+
+    @app.get("/api/sessions/{session_id}")
+    async def get_session(session_id: str):
+        """Get session details."""
+        if not store:
+            raise HTTPException(status_code=501, detail="Store not configured")
+        session = store.get_session(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return session
+
+    @app.get("/api/sessions/{session_id}/messages")
+    async def get_session_messages(
+        session_id: str,
+        limit: int = Query(100, ge=1, le=1000),
+        offset: int = Query(0, ge=0),
+    ):
+        """Get messages for a session."""
+        if not store:
+            raise HTTPException(status_code=501, detail="Store not configured")
+        return store.get_messages(session_id, limit=limit, offset=offset)
+
+    @app.delete("/api/sessions/{session_id}")
+    async def delete_session(session_id: str):
+        """Delete a session."""
+        if not store:
+            raise HTTPException(status_code=501, detail="Store not configured")
+        if not store.delete_session(session_id):
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {"deleted": session_id}
+
+    @app.post("/api/sessions/{session_id}/resume")
+    async def resume_session(session_id: str):
+        """Resume (load) a session into agent context."""
+        if not store:
+            raise HTTPException(status_code=501, detail="Store not configured")
+        if store.load_session(session_id, agent):
+            return {"resumed": session_id}
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # ---- Memory API ----
+
+    @app.get("/api/memories")
+    async def list_memories(
+        type: str = Query("all", description="Memory type filter"),
+        limit: int = Query(50, ge=1, le=200),
+    ):
+        """List memories."""
+        if not memory:
+            return []
+        return memory.list_memories(
+            type=None if type == "all" else type, limit=limit,
+        )
+
+    @app.post("/api/memories")
+    async def add_memory(
+        content: str = Query(..., description="Memory content"),
+        type: str = Query("semantic", description="Memory type"),
+        importance: float = Query(0.5, ge=0.0, le=1.0),
+    ):
+        """Add a memory."""
+        if not memory:
+            raise HTTPException(status_code=501, detail="Memory not configured")
+        memory_id = memory.add_memory(
+            type=type, content=content, importance=importance,
+        )
+        return {"memory_id": memory_id}
+
+    @app.get("/api/memories/search")
+    async def search_memories(
+        q: str = Query(..., description="Search query"),
+        type: str = Query("all", description="Memory type filter"),
+        top_k: int = Query(10, ge=1, le=50),
+    ):
+        """Search memories (hybrid retrieval)."""
+        if not memory:
+            return []
+        from app.retriever import HybridRetriever
+
+        retriever = HybridRetriever(
+            memory._db_path, memory._zvec_path, memory,
+        )
+        types = None if type == "all" else [type]
+        return retriever.search(q, top_k=top_k, memory_types=types)
+
+    @app.delete("/api/memories/{memory_id}")
+    async def delete_memory(memory_id: str):
+        """Delete a memory."""
+        if not memory:
+            raise HTTPException(status_code=501, detail="Memory not configured")
+        if not memory.delete_memory(memory_id):
+            raise HTTPException(status_code=404, detail="Memory not found")
+        return {"deleted": memory_id}
+
     return app
 
 
@@ -442,14 +562,33 @@ def main() -> None:
 
     from app.agent import build_agent
     from app.config import load_config
+    from app.memory import MemoryStore
+    from app.memory_tool import set_memory_store, set_retriever
+    from app.retriever import HybridRetriever
+    from app.store import SessionStore
     from app.tools import build_toolkit
 
     async def _run() -> None:
         config = load_config()
+
+        # Initialize persistence
+        os.makedirs(config.data_dir, exist_ok=True)
+        store = SessionStore(config.db_path)
+        memory = MemoryStore(config.db_path, config.zvec_path)
+        retriever = HybridRetriever(
+            config.db_path, config.zvec_path, memory,
+        )
+        set_memory_store(memory)
+        set_retriever(retriever)
+
         toolkit = await build_toolkit(config)
-        agent = await build_agent(config, toolkit)
+        agent = await build_agent(
+            config, toolkit, store=store, memory=memory,
+        )
         tm = TaskManager()
-        app = create_app(agent, task_manager=tm)
+        app = create_app(
+            agent, task_manager=tm, store=store, memory=memory,
+        )
         uvicorn_config = uvicorn.Config(app, host="0.0.0.0", port=8000)
         server = uvicorn.Server(uvicorn_config)
         await server.serve()

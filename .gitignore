@@ -11,3 +11,6 @@ wheels/
 
 # Environment variables
 .env
+
+# Data directory (persistent storage, logs, tasks)
+data/

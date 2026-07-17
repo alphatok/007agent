@@ -2,6 +2,10 @@
 
 Creates a fully configured Agent instance from config and toolkit.
 """
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from agentscope.agent import Agent
 from agentscope.agent._config import ContextConfig
 from agentscope.credential import DeepSeekCredential
@@ -12,6 +16,10 @@ from agentscope.tool import Toolkit
 
 from app.config import Config
 from app.subagent import SubagentLoader, SubagentRunner, set_subagent_runner
+
+if TYPE_CHECKING:
+    from app.store import SessionStore
+    from app.memory import MemoryStore
 
 SYSTEM_PROMPT = (
     "You are a helpful AI assistant powered by DeepSeek V4 Pro. "
@@ -29,12 +37,16 @@ SYSTEM_PROMPT = (
 )
 
 
-async def build_agent(config: Config, toolkit: Toolkit) -> Agent:
+async def build_agent(config: Config, toolkit: Toolkit,
+                      store: "SessionStore | None" = None,
+                      memory: "MemoryStore | None" = None) -> Agent:
     """Build a fully configured Agent instance.
 
     Args:
         config: Application configuration with API keys and settings.
         toolkit: Configured Toolkit with tools, skills, and MCP clients.
+        store: Optional SessionStore for session persistence.
+        memory: Optional MemoryStore for cross-session memory.
 
     Returns:
         An Agent instance ready for use.
@@ -52,7 +64,7 @@ async def build_agent(config: Config, toolkit: Toolkit) -> Agent:
     if skill_instructions:
         system_prompt = SYSTEM_PROMPT + "\n\n" + skill_instructions
 
-    return Agent(
+    agent = Agent(
         name="AgentScope",
         system_prompt=system_prompt,
         model=DeepSeekChatModel(
@@ -71,3 +83,9 @@ async def build_agent(config: Config, toolkit: Toolkit) -> Agent:
             trigger_ratio=config.compaction_trigger_ratio,
         ),
     )
+
+    # Inject store and memory for access by CLI/Service
+    object.__setattr__(agent, "_store", store)
+    object.__setattr__(agent, "_memory", memory)
+
+    return agent

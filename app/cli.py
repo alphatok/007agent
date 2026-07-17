@@ -3,6 +3,7 @@
 Interactive terminal-based agent loop with full tool execution visibility.
 """
 import asyncio
+import os
 
 from agentscope.agent import Agent
 from agentscope.event import EventType
@@ -123,13 +124,60 @@ def main() -> None:
     """CLI entry point."""
     from app.agent import build_agent
     from app.config import load_config
+    from app.memory import MemoryStore
+    from app.memory_tool import set_memory_store, set_retriever
+    from app.retriever import HybridRetriever
+    from app.store import SessionStore
     from app.tools import build_toolkit
 
     async def _run() -> None:
         config = load_config()
+
+        # Initialize persistence
+        os.makedirs(config.data_dir, exist_ok=True)
+        store = SessionStore(config.db_path)
+        memory = MemoryStore(config.db_path, config.zvec_path)
+        retriever = HybridRetriever(
+            config.db_path, config.zvec_path, memory,
+        )
+        set_memory_store(memory)
+        set_retriever(retriever)
+
         toolkit = await build_toolkit(config)
-        agent = await build_agent(config, toolkit)
+        agent = await build_agent(config, toolkit, store=store, memory=memory)
+
+        # Session management
+        if config.persistence_mode != "none":
+            sessions = store.list_sessions(limit=10)
+            if sessions:
+                print("\nRecent sessions:")
+                for i, s in enumerate(sessions):
+                    print(f"  [{i}] {s['name']} "
+                          f"({s['message_count']} msgs, "
+                          f"{s['updated_at'][:19]})")
+                print("  [n] New session")
+                choice = input("Select session (default=n): ").strip()
+                if choice and choice.isdigit():
+                    idx = int(choice)
+                    if 0 <= idx < len(sessions):
+                        store.load_session(sessions[idx]["id"], agent)
+                        print(f"Resumed session: {sessions[idx]['name']}")
+                else:
+                    store.create_session()
+            else:
+                store.create_session(name="CLI Session")
+
         await run_cli(agent)
+
+        # Cleanup on exit
+        if config.persistence_mode != "none":
+            store.cleanup_old_sessions(
+                config.session_max_count, config.session_max_age_days,
+            )
+            if config.memory_enabled:
+                memory.decay(
+                    max_age_days=config.memory_decay_days,
+                )
 
     asyncio.run(_run())
 

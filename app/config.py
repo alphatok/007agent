@@ -35,6 +35,45 @@ class Config:
     compaction_warning_tokens: int = 20000
     """Token threshold for context warning level."""
 
+    # ---- Persistence ----
+    data_dir: str = "data"
+    """Data directory for all persistent storage."""
+
+    db_path: str = "data/agent.db"
+    """SQLite database path."""
+
+    zvec_path: str = "data/zvec"
+    """zvec vector database path."""
+
+    session_max_count: int = 50
+    """Maximum number of sessions to retain."""
+
+    session_max_age_days: int = 30
+    """Maximum age of sessions in days before cleanup."""
+
+    persistence_mode: str = "save-all"
+    """Persistence mode: save-all | chat-only | none."""
+
+    # ---- Memory ----
+    memory_enabled: bool = True
+    """Whether memory system is enabled."""
+
+    memory_extraction_enabled: bool = True
+    """Whether to auto-extract memories during compaction."""
+
+    memory_consolidation_threshold: int = 3
+    """Access count threshold for episodic -> semantic consolidation."""
+
+    memory_decay_days: int = 30
+    """Days before low-importance memories are decayed."""
+
+    # ---- Embedding ----
+    embedding_backend: str = "fastembed"
+    """Embedding backend: fastembed | deepseek."""
+
+    embedding_model_name: str = "BAAI/bge-small-zh-v1.5"
+    """FastEmbed model name (only used when embedding_backend=fastembed)."""
+
 
 def load_config() -> Config:
     """Load configuration from environment variables.
@@ -56,5 +95,30 @@ def load_config() -> Config:
         ),
         compaction_warning_tokens=int(
             os.getenv("COMPACTION_WARNING_TOKENS", "20000"),
+        ),
+        data_dir=os.getenv("DATA_DIR", "data"),
+        db_path=os.getenv("DB_PATH", "data/agent.db"),
+        zvec_path=os.getenv("ZVEC_PATH", "data/zvec"),
+        session_max_count=int(
+            os.getenv("SESSION_MAX_COUNT", "50"),
+        ),
+        session_max_age_days=int(
+            os.getenv("SESSION_MAX_AGE_DAYS", "30"),
+        ),
+        persistence_mode=os.getenv("PERSISTENCE_MODE", "save-all"),
+        memory_enabled=os.getenv("MEMORY_ENABLED", "true").lower() == "true",
+        memory_extraction_enabled=os.getenv(
+            "MEMORY_EXTRACTION_ENABLED", "true"
+        ).lower()
+        == "true",
+        memory_consolidation_threshold=int(
+            os.getenv("MEMORY_CONSOLIDATION_THRESHOLD", "3"),
+        ),
+        memory_decay_days=int(
+            os.getenv("MEMORY_DECAY_DAYS", "30"),
+        ),
+        embedding_backend=os.getenv("EMBEDDING_BACKEND", "fastembed"),
+        embedding_model_name=os.getenv(
+            "EMBEDDING_MODEL_NAME", "BAAI/bge-small-zh-v1.5"
         ),
     )

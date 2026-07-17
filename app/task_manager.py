@@ -1,6 +1,6 @@
 """Async task manager for HTTP API task submission and tracking.
 
-Tasks are stored as JSON files in ``.trae/tasks/`` directory.
+Tasks are stored as JSON files in ``data/tasks/`` directory.
 Status machine: pending -> running -> completed/failed/cancelled
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from agentscope.agent import Agent
 
-TASKS_DIR = Path(".trae/tasks")
+TASKS_DIR = Path("data/tasks")
 
 
 def _now() -> str:
