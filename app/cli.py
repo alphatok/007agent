@@ -42,6 +42,12 @@ async def run_cli(agent: Agent) -> None:
             continue
 
         print()
+        # Save user message
+        store = getattr(agent, "_store", None)
+        if store:
+            if not hasattr(agent, "_chat_session_id"):
+                agent._chat_session_id = store.create_session(name="CLI Session")
+            store.save_message(agent._chat_session_id, "user", user_input)
         await _stream_reply(agent, user_input)
 
 
@@ -72,9 +78,16 @@ async def _stream_reply(agent: Agent, user_input: str) -> None:
                 print("Agent: ", end="", flush=True)
             case EventType.TEXT_BLOCK_DELTA:
                 if evt.delta:
+                    full_response += evt.delta
                     print(evt.delta, end="", flush=True)
             case EventType.REPLY_END:
                 print()
+                store = getattr(agent, "_store", None)
+                if store and full_response:
+                    store.save_message(
+                        getattr(agent, "_chat_session_id", ""),
+                        "assistant", full_response,
+                    )
             case EventType.TOOL_CALL_START:
                 tool_names[evt.tool_call_id] = evt.tool_call_name
                 print(f"\n  [Tool] {evt.tool_call_name}", flush=True)

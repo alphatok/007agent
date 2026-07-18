@@ -27,6 +27,7 @@ SYSTEM_PROMPT = (
     "shell commands, code search, task management, web search, and Chrome "
     "browser control via Chrome DevTools. "
     "Use these tools effectively to help the user accomplish their goals. "
+    "Always use the web_search tool to search the internet for real-time information, current events, weather, news, and any facts you are not certain about. Do not guess or refuse to answer — search first. "
     "When working on complex tasks, use the task management tools "
     "(TaskCreate, TaskGet, TaskList, TaskUpdate) to plan and track "
     "your progress. "

@@ -37,7 +37,21 @@ CHAT_PAGE = """<!DOCTYPE html>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#c9d1d9;height:100vh;display:flex;flex-direction:column}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#c9d1d9;height:100vh;display:flex}
+/* Sidebar */
+#sidebar{width:240px;min-width:240px;background:#161b22;border-right:1px solid #30363d;display:flex;flex-direction:column;overflow:hidden}
+#sidebar .brand{padding:14px 16px;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:8px}
+#sidebar .brand .dot{width:8px;height:8px;border-radius:50%;background:#3fb950;box-shadow:0 0 6px #3fb950}
+#sidebar .brand span{font-size:14px;font-weight:600;color:#f0f6fc}
+#sidebar .new-btn{margin:10px 12px;padding:8px 0;border-radius:6px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;font-size:13px;cursor:pointer;text-align:center;transition:background .15s}
+#sidebar .new-btn:hover{background:#30363d}
+#session-list{flex:1;overflow-y:auto;padding:0 8px}
+#session-list .item{padding:10px 12px;margin:2px 0;border-radius:6px;cursor:pointer;font-size:13px;color:#8b949e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:background .1s}
+#session-list .item:hover{background:#21262d;color:#c9d1d9}
+#session-list .item.active{background:#1f6feb22;color:#58a6ff;border:1px solid #1f6feb44}
+#session-list .item .time{font-size:11px;color:#484f58;margin-top:2px}
+/* Main Chat */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 header{background:#161b22;padding:12px 20px;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:10px}
 header .dot{width:10px;height:10px;border-radius:50%;background:#3fb950;box-shadow:0 0 8px #3fb950}
 header h1{font-size:18px;font-weight:600;color:#f0f6fc}
@@ -48,79 +62,82 @@ header span{font-size:12px;color:#8b949e;margin-left:auto}
 .msg.agent{align-self:flex-start;background:#161b22;border:1px solid #30363d;border-bottom-left-radius:4px}
 .msg .label{font-size:11px;color:#8b949e;margin-bottom:8px;font-weight:500;letter-spacing:.5px;text-transform:uppercase}
 .msg.agent .content{color:#c9d1d9}
-/* Markdown - Headings */
 .msg.agent .content h1{font-size:20px;margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid #21262d;color:#f0f6fc;font-weight:600}
 .msg.agent .content h2{font-size:17px;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid #21262d;color:#f0f6fc;font-weight:600}
 .msg.agent .content h3{font-size:15px;margin:12px 0 4px;color:#f0f6fc;font-weight:600}
 .msg.agent .content h4{font-size:14px;margin:10px 0 4px;color:#f0f6fc;font-weight:600}
-/* Markdown - Text */
 .msg.agent .content p{margin:6px 0}
 .msg.agent .content strong{color:#f0f6fc}
 .msg.agent .content em{color:#d2a8ff}
-/* Markdown - Lists */
 .msg.agent .content ul,.msg.agent .content ol{padding-left:24px;margin:6px 0}
 .msg.agent .content li{margin:3px 0}
 .msg.agent .content li::marker{color:#8b949e}
-/* Markdown - Code */
 .msg.agent .content code{background:#1c2128;padding:2px 6px;border-radius:4px;font-size:85%;font-family:'SF Mono',Monaco,Menlo,Consolas,monospace;color:#d2a8ff;border:1px solid #30363d}
 .msg.agent .content pre{background:#161b22;padding:14px 16px;border-radius:8px;overflow-x:auto;margin:8px 0;font-size:13px;border:1px solid #30363d;line-height:1.5}
 .msg.agent .content pre code{background:none;padding:0;border:none;color:#c9d1d9;font-size:inherit}
-/* Markdown - Blockquote */
 .msg.agent .content blockquote{border-left:3px solid #3fb950;padding:6px 14px;margin:8px 0;color:#8b949e;background:#1c2128;border-radius:0 6px 6px 0}
 .msg.agent .content blockquote p{margin:2px 0}
-/* Markdown - Links */
 .msg.agent .content a{color:#58a6ff;text-decoration:none}
 .msg.agent .content a:hover{text-decoration:underline}
-/* Markdown - Tables */
 .msg.agent .content table{border-collapse:collapse;margin:8px 0;width:100%;font-size:13px}
 .msg.agent .content th{background:#1c2128;color:#f0f6fc;font-weight:600;padding:8px 12px;border:1px solid #30363d;text-align:left}
 .msg.agent .content td{padding:7px 12px;border:1px solid #30363d}
 .msg.agent .content tr:nth-child(even){background:#161b22}
 .msg.agent .content tr:hover{background:#1c2128}
-/* Markdown - Horizontal rule */
 .msg.agent .content hr{border:none;border-top:1px solid #30363d;margin:12px 0}
-/* Markdown - Images */
 .msg.agent .content img{max-width:100%;border-radius:8px;margin:4px 0}
-/* Tool status */
 .tool{font-size:12px;padding:3px 0;display:flex;align-items:center;gap:6px}
 .tool .icon{min-width:44px;font-weight:600;font-size:11px}
 .tool .icon.start{color:#d29922}
 .tool .icon.ok{color:#3fb950}
 .tool .icon.fail{color:#f85149}
 .tool .name{color:#8b949e}
-/* Download button */
-.dl-btn{display:inline-flex;align-items:center;gap:5px;margin:6px 6px 0 0;padding:5px 12px;font-size:12px;background:#1c2128;color:#3fb950;border:1px solid #30363d;border-radius:6px;cursor:pointer;text-decoration:none;transition:all .15s}
+.dl-btn{display:inline-flex;align-items:center;gap:5px;margin:6px 6px 0 0;padding:5px 12px;font-size:12px;background:#1c2128;color:#3fb950;border:1px solid #30363d;border-radius:6px;cursor:pointer;text-decoration:none;transition:background .15s}
 .dl-btn:hover{background:#238636;color:#fff;border-color:#238636}
-/* Input */
 footer{padding:12px 20px;border-top:1px solid #30363d;background:#161b22;display:flex;gap:10px}
 footer input{flex:1;padding:10px 14px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:14px;outline:none;transition:border-color .15s}
 footer input:focus{border-color:#58a6ff;box-shadow:0 0 0 3px rgba(88,166,255,.15)}
-footer button{padding:10px 20px;border-radius:8px;border:1px solid #238636;background:#238636;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+footer button{padding:10px 20px;border-radius:8px;border:1px solid #238636;background:#238636;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s}
 footer button:hover{background:#2ea043}
 footer button:disabled{opacity:.5;cursor:not-allowed}
-/* Scrollbar */
 #chat::-webkit-scrollbar{width:6px}
 #chat::-webkit-scrollbar-track{background:transparent}
 #chat::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+#session-list::-webkit-scrollbar{width:4px}
+#session-list::-webkit-scrollbar-track{background:transparent}
+#session-list::-webkit-scrollbar-thumb{background:#30363d;border-radius:2px}
 </style>
 </head>
 <body>
-<header>
-  <div class="dot"></div>
-  <h1>AgentScope Chat</h1>
-  <span>DeepSeek V4 Pro</span>
-</header>
-<div id="chat"></div>
-<footer>
-  <input id="input" placeholder="Type a message..." autofocus>
-  <button id="send" onclick="send()">Send</button>
-</footer>
+<div id="sidebar">
+  <div class="brand">
+    <div class="dot"></div>
+    <span>Chats</span>
+  </div>
+  <button class="new-btn" onclick="newSession()">+ New Chat</button>
+  <div id="session-list"></div>
+</div>
+<div id="main">
+  <header>
+    <h1>AgentScope Chat</h1>
+    <span>DeepSeek V4 Pro</span>
+  </header>
+  <div id="chat"></div>
+  <footer>
+    <input id="input" placeholder="Type a message..." autofocus>
+    <button id="send" onclick="send()">Send</button>
+  </footer>
+</div>
 <script>
 const chat=document.getElementById('chat');
 const input=document.getElementById('input');
 const btn=document.getElementById('send');
+const sessionList=document.getElementById('session-list');
 let busy=false;
+let activeSessionId=null;
+
 input.addEventListener('keydown',e=>{if(e.key==='Enter')send()});
+
 function addMsg(role,text){
   const d=document.createElement('div');
   d.className='msg '+role;
@@ -130,6 +147,7 @@ function addMsg(role,text){
   chat.scrollTop=chat.scrollHeight;
   return d;
 }
+
 function addTool(text,cls){
   const d=document.createElement('div');
   d.className='tool';
@@ -139,6 +157,7 @@ function addTool(text,cls){
   chat.scrollTop=chat.scrollHeight;
   return d;
 }
+
 function addDlBtn(parent,path,label){
   const a=document.createElement('a');
   a.className='dl-btn';
@@ -147,7 +166,7 @@ function addDlBtn(parent,path,label){
   a.textContent='\\u2b07 '+label;
   parent.appendChild(a);
 }
-// Detect file paths in text and add download buttons
+
 function detectFiles(text,parent){
   const re=/\\b([\\/]\\S+?\\.\\w+)\\b/g;
   const seen=new Set();
@@ -160,6 +179,73 @@ function detectFiles(text,parent){
     }
   }
 }
+
+// ---- Session Management ----
+
+async function loadSessions(){
+  try{
+    const r=await fetch('/api/sessions');
+    const sessions=await r.json();
+    sessionList.innerHTML='';
+    sessions.forEach(s=>{
+      const div=document.createElement('div');
+      div.className='item'+(s.id===activeSessionId?' active':'');
+      div.innerHTML='<div>'+escapeHtml(s.display_name||('Session '+s.created_at.slice(0,10)))+'</div><div class="time">'+s.created_at.slice(0,16)+'</div>';
+      div.onclick=()=>switchSession(s.id);
+      sessionList.appendChild(div);
+    });
+  }catch(e){console.error('loadSessions:',e);}
+}
+
+function escapeHtml(text){
+  const d=document.createElement('div');
+  d.textContent=text;
+  return d.innerHTML;
+}
+
+async function loadActiveSession(){
+  try{
+    const r=await fetch('/api/sessions/active');
+    if(!r.ok)return;
+    const data=await r.json();
+    activeSessionId=data.session_id;
+    renderHistory(data.messages||[]);
+    loadSessions();
+  }catch(e){console.error('loadActiveSession:',e);}
+}
+
+function renderHistory(messages){
+  chat.innerHTML='';
+  messages.forEach(msg=>{
+    const d=addMsg(msg.role,msg.content);
+    if(msg.role==='agent') detectFiles(msg.content,d.querySelector('.content'));
+  });
+}
+
+async function switchSession(sid){
+  if(busy||sid===activeSessionId)return;
+  try{
+    const r=await fetch('/api/sessions/'+sid+'/switch',{method:'POST'});
+    if(!r.ok){alert('Failed to switch session');return;}
+    const data=await r.json();
+    activeSessionId=data.session_id;
+    renderHistory(data.messages||[]);
+    loadSessions();
+  }catch(e){console.error('switchSession:',e);}
+}
+
+async function newSession(){
+  if(busy)return;
+  try{
+    const r=await fetch('/api/sessions/new',{method:'POST'});
+    if(!r.ok){alert('Failed to create session');return;}
+    const data=await r.json();
+    activeSessionId=data.session_id;
+    chat.innerHTML='';
+    loadSessions();
+  }catch(e){console.error('newSession:',e);}
+}
+
 async function send(){
   const text=input.value.trim();
   if(!text||busy)return;
@@ -172,7 +258,6 @@ async function send(){
   chat.appendChild(agentDiv);
   const contentDiv=agentDiv.querySelector('.content');
   let rawText='';
-  // Render markdown on each delta
   function renderMd(){
     if(rawText) contentDiv.innerHTML=marked.parse(rawText);
   }
@@ -207,18 +292,40 @@ async function send(){
       }
       chat.scrollTop=chat.scrollHeight;
     }
-    // Final render + file detection
     renderMd();
     detectFiles(rawText,contentDiv);
+    loadSessions();
   }catch(e){
     contentDiv.innerHTML='<span style="color:#ff4444">Error: '+e.message+'</span>';
   }
   busy=false;btn.disabled=false;
   input.focus();
 }
+
+loadActiveSession();
 </script>
 </body>
 </html>"""
+
+
+def _read_active_session(data_dir: str) -> str | None:
+    """Read active session ID from file."""
+    active_file = os.path.join(data_dir, "active_session.txt")
+    if not os.path.exists(active_file):
+        return None
+    try:
+        with open(active_file, "r") as f:
+            sid = f.read().strip()
+            return sid if sid else None
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _write_active_session(data_dir: str, session_id: str) -> None:
+    """Write active session ID to file."""
+    active_file = os.path.join(data_dir, "active_session.txt")
+    with open(active_file, "w") as f:
+        f.write(session_id)
 
 
 def create_app(
@@ -311,7 +418,20 @@ def create_app(
             )
 
         async def generate():
+            # Use active session (persisted across restarts)
+            session_id = getattr(agent, "_active_session_id", None)
+            if not session_id:
+                session_id = store.create_session(name="web-chat") if store else ""
+                if store:
+                    pass  # active_session already written on startup
+                object.__setattr__(agent, "_active_session_id", session_id)
+
+            # Persist user message
+            if store and session_id:
+                store.save_message(session_id, "user", content)
+
             _last_summary: str | None = agent.state.summary
+            full_reply = ""
             async for evt in agent.reply_stream(
                 UserMsg("user", content),
             ):
@@ -327,6 +447,7 @@ def create_app(
                         })
 
                 if evt.type == EventType.TEXT_BLOCK_DELTA and evt.delta:
+                    full_reply += evt.delta
                     yield _sse({"type": "text", "text": evt.delta})
                 elif evt.type == EventType.TOOL_CALL_START:
                     yield _sse({
@@ -339,7 +460,7 @@ def create_app(
                         "text": evt.delta.strip()[:200],
                     })
                 elif evt.type == EventType.TOOL_RESULT_END:
-                    state = evt.state.value
+                    state = evt.state
                     status_map = {
                         "SUCCESS": "[OK]",
                         "ERROR": "[FAIL]",
@@ -351,6 +472,11 @@ def create_app(
                         "name": state,
                         "status": status_map.get(state, "[??]"),
                     })
+
+            # Persist assistant reply
+            if store and full_reply.strip():
+                store.save_message(session_id, "assistant", full_reply.strip())
+
             yield _sse({"type": "done"})
 
         return StreamingResponse(
@@ -432,10 +558,17 @@ def create_app(
 
     @app.get("/api/sessions")
     async def list_sessions(limit: int = Query(50, ge=1, le=200)):
-        """List all sessions."""
+        """List all sessions with display_name."""
         if not store:
             return []
-        return store.list_sessions(limit=limit)
+        sessions = store.list_sessions(limit=limit)
+        for s in sessions:
+            first_msg = store.get_first_user_message(s["id"])
+            if first_msg:
+                s["display_name"] = first_msg[:30] + ("..." if len(first_msg) > 30 else "")
+            else:
+                s["display_name"] = f"Session {s['created_at'][:19]}"
+        return sessions
 
     @app.post("/api/sessions")
     async def create_session(
@@ -447,6 +580,29 @@ def create_app(
         session_id = store.create_session(name=name or None)
         session = store.get_session(session_id)
         return {"session_id": session_id, "session": session}
+
+    # ---- Active Session API ----
+
+    @app.get("/api/sessions/active")
+    async def get_active_session(
+        limit: int = Query(50, ge=1, le=100),
+    ):
+        """Get active session with recent ."""
+        if not store:
+            raise HTTPException(status_code=501, detail="Store not configured")
+        session_id = getattr(agent, "_active_session_id", None)
+        if not session_id:
+            session_id = store.create_session()
+            _write_active_session(os.path.dirname(store._db_path), session_id)
+            object.__setattr__(agent, "_active_session_id", session_id)
+        session = store.get_session(session_id)
+        messages = store.get_messages(session_id, limit=limit)
+        return {
+            "session_id": session_id,
+            "session": session,
+            "messages": messages,
+        }
+
 
     @app.get("/api/sessions/{session_id}")
     async def get_session(session_id: str):
@@ -486,6 +642,42 @@ def create_app(
         if store.load_session(session_id, agent):
             return {"resumed": session_id}
         raise HTTPException(status_code=404, detail="Session not found")
+
+    @app.post("/api/sessions/new")
+    async def new_session():
+        """Create a new session and set it as active."""
+        if not store:
+            raise HTTPException(status_code=501, detail="Store not configured")
+        # Clear agent context
+        agent.state.context.clear()
+        # Create new session
+        session_id = store.create_session()
+        _write_active_session(os.path.dirname(store._db_path), session_id)
+        object.__setattr__(agent, "_active_session_id", session_id)
+        return {
+            "session_id": session_id,
+            "session": store.get_session(session_id),
+        }
+
+    @app.post("/api/sessions/{session_id}/switch")
+    async def switch_session(session_id: str):
+        """Switch to a different session (validate first, then clear+load)."""
+        if not store:
+            raise HTTPException(status_code=501, detail="Store not configured")
+        # Validate target session exists first
+        session = store.get_session(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+        # Safe to switch
+        agent.state.context.clear()
+        store.load_session(session_id, agent, limit=50)
+        _write_active_session(os.path.dirname(store._db_path), session_id)
+        object.__setattr__(agent, "_active_session_id", session_id)
+        return {
+            "session_id": session_id,
+            "session": session,
+            "messages": store.get_messages(session_id, limit=50),
+        }
 
     # ---- Memory API ----
 
@@ -585,6 +777,15 @@ def main() -> None:
         agent = await build_agent(
             config, toolkit, store=store, memory=memory,
         )
+
+        # Recover active session
+        session_id = _read_active_session(config.data_dir)
+        if session_id and store.get_session(session_id):
+            store.load_session(session_id, agent, limit=50)
+        else:
+            session_id = store.create_session()
+            _write_active_session(config.data_dir, session_id)
+        object.__setattr__(agent, "_active_session_id", session_id)
         tm = TaskManager()
         app = create_app(
             agent, task_manager=tm, store=store, memory=memory,

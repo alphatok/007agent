@@ -278,13 +278,27 @@ class SessionStore:
 
     # ---- Session Recovery ----
 
-    def load_session(self, session_id: str, agent: "Agent") -> bool:
-        """Load historical messages into agent.state.context."""
+    def load_session(self, session_id: str, agent: "Agent",
+                     limit: int = 50) -> bool:
+        """Load historical messages into agent.state.context.
+
+        Args:
+            session_id: Session to load.
+            agent: Agent instance whose context will be populated.
+            limit: Max recent messages to load (default 50).
+
+        Returns:
+            True if at least one message was loaded.
+        """
         from agentscope.message import Msg, TextBlock
 
         messages = self.get_messages(session_id)
         if not messages:
             return False
+
+        # Load only the most recent `limit` messages
+        if limit > 0 and len(messages) > limit:
+            messages = messages[-limit:]
 
         for msg in messages:
             agent_msg = Msg(
@@ -295,6 +309,16 @@ class SessionStore:
             agent.state.context.append(agent_msg)
 
         return True
+
+    def get_first_user_message(self, session_id: str) -> str | None:
+        """Get the first user's content for session naming."""
+        row = self._conn.execute(
+            """SELECT content FROM messages
+               WHERE session_id = ? AND role = 'user'
+               ORDER BY created_at ASC LIMIT 1""",
+            (session_id,),
+        ).fetchone()
+        return row["content"] if row else None
 
     def resume_last_session(self, agent: "Agent") -> str | None:
         """Resume the most recent session, return session_id or None."""
