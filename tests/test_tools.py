@@ -21,7 +21,7 @@ class TestBuildToolkit:
                 deepseek_api_key="sk-test",
                 chrome_mcp_enabled=False,
             )
-            toolkit = await build_toolkit(config)
+            toolkit, _ = await build_toolkit(config)
             assert toolkit is not None
             # Built-in tools should be in the first tool group
             basic_group = toolkit.tool_groups[0]
@@ -40,7 +40,7 @@ class TestBuildToolkit:
             deepseek_api_key="sk-test",
             chrome_mcp_enabled=False,
         )
-        toolkit = await build_toolkit(config)
+        toolkit, _ = await build_toolkit(config)
         assert toolkit is not None
 
     def test_builtin_tool_count(self) -> None:

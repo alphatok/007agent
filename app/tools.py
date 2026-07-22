@@ -112,10 +112,17 @@ async def ask_user(
     question: str,
     options: list[str] | None = None,
 ) -> AsyncGenerator[ToolChunk, None]:
-    """Pause execution and ask the user a question.
+    """Pause a long-running task to ask the user a critical decision question.
 
-    The task will wait for the user to respond before continuing.
-    Use this for critical decisions that require human input.
+    ONLY use this tool during complex multi-step tasks when you encounter a
+    genuine decision point that requires human judgment (e.g., choosing
+    between two implementation approaches, confirming a risky operation).
+
+    DO NOT use this tool for:
+    - Simple greetings, casual conversation, or small talk
+    - Straightforward questions the user asks directly
+    - Clarifying what the user meant (just ask in your text reply)
+    - Any situation where you can proceed without user input
 
     Args:
         question: The question to ask the user
@@ -204,14 +211,14 @@ BUILTIN_TOOLS = [
 ]
 
 
-async def build_toolkit(config: Config) -> Toolkit:
+async def build_toolkit(config: Config) -> tuple[Toolkit, list[MCPClient]]:
     """Build a Toolkit with all tools and optional MCP clients.
 
     Args:
         config: Application configuration.
 
     Returns:
-        Configured Toolkit instance ready for agent use.
+        Tuple of (configured Toolkit, list of connected MCP clients).
     """
     # Read retry configuration for network tool calls
     retry_max = config.tool_retry_max
@@ -242,8 +249,9 @@ async def build_toolkit(config: Config) -> Toolkit:
     # Instruction Skills: load SKILL.md files from skills/ subdirectories
     skill_loader = LocalSkillLoader(directory="skills/", scan_subdir=True)
 
-    return Toolkit(
+    toolkit = Toolkit(
         tools=all_tools,
         skills_or_loaders=[skill_loader],
         mcps=mcps if mcps else None,
     )
+    return toolkit, mcps

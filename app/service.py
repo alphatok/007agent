@@ -91,12 +91,30 @@ header span{font-size:12px;color:#8b949e;margin-left:auto}
 .msg.agent .content tr:hover{background:#1c2128}
 .msg.agent .content hr{border:none;border-top:1px solid #30363d;margin:12px 0}
 .msg.agent .content img{max-width:100%;border-radius:8px;margin:4px 0}
-.tool{font-size:12px;padding:3px 0;display:flex;align-items:center;gap:6px}
-.tool .icon{min-width:44px;font-weight:600;font-size:11px}
-.tool .icon.start{color:#d29922}
-.tool .icon.ok{color:#3fb950}
-.tool .icon.fail{color:#f85149}
-.tool .name{color:#8b949e}
+/* Tool Cards */
+.tool-card{margin:8px 0;border:1px solid #30363d;border-radius:8px;overflow:hidden;background:#161b22;font-size:12px;animation:slideIn .2s ease}
+.tool-card .tc-header{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;transition:background .1s;user-select:none}
+.tool-card .tc-header:hover{background:#1c2128}
+.tool-card .tc-icon{width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.tool-card .tc-icon.running{background:#d2992222;color:#d29922}
+.tool-card .tc-icon.ok{background:#3fb95022;color:#3fb950}
+.tool-card .tc-icon.fail{background:#f8514922;color:#f85149}
+.tool-card .tc-icon.stop{background:#8b949e22;color:#8b949e}
+.tool-card .tc-name{color:#e6edf3;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tool-card .tc-status{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+.tool-card .tc-status.ok{color:#3fb950;background:#3fb95018}
+.tool-card .tc-status.fail{color:#f85149;background:#f8514918}
+.tool-card .tc-status.running{color:#d29922;background:#d2992218}
+.tool-card .tc-status.stop{color:#8b949e;background:#8b949e18}
+.tool-card .tc-chevron{color:#484f58;transition:transform .2s;font-size:10px}
+.tool-card.expanded .tc-chevron{transform:rotate(180deg)}
+.tool-card .tc-body{display:none;padding:0 12px 10px;border-top:1px solid #21262d}
+.tool-card.expanded .tc-body{display:block}
+.tool-card .tc-body .tc-output{font-family:'SF Mono',Monaco,Menlo,Consolas,monospace;font-size:11px;color:#8b949e;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;line-height:1.5;margin-top:6px;padding:8px;background:#0d1117;border-radius:4px;border:1px solid #21262d}
+.tool-card .tc-body .tc-output.binary{color:#f85149;font-style:italic}
+.tool-card .tc-body .tc-output::-webkit-scrollbar{width:4px}
+.tool-card .tc-body .tc-output::-webkit-scrollbar-thumb{background:#30363d;border-radius:2px}
+.tool-card .tc-empty{color:#484f58;font-style:italic;padding:4px 0}
 .dl-btn{display:inline-flex;align-items:center;gap:5px;margin:6px 6px 0 0;padding:5px 12px;font-size:12px;background:#1c2128;color:#3fb950;border:1px solid #30363d;border-radius:6px;cursor:pointer;text-decoration:none;transition:background .15s}
 .dl-btn:hover{background:#238636;color:#fff;border-color:#238636}
 footer{padding:12px 20px;border-top:1px solid #30363d;background:#161b22;display:flex;gap:10px}
@@ -119,18 +137,23 @@ footer button:disabled{opacity:.5;cursor:not-allowed}
 #progress-text{font-size:12px;color:#8b949e;margin-bottom:6px;display:flex;justify-content:space-between}
 #progress-text .step{color:#c9d1d9}
 #progress-text .pct{color:#3fb950;font-weight:600}
-/* Human-in-the-loop Modal */
-#question-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.65);z-index:1000;justify-content:center;align-items:center}
-#question-overlay.show{display:flex}
-#question-modal{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 4px 24px rgba(0,0,0,.5)}
-#question-modal h3{font-size:16px;color:#f0f6fc;margin-bottom:12px;font-weight:600}
-#question-modal p{font-size:14px;color:#c9d1d9;margin-bottom:16px;line-height:1.5}
-#question-modal .options{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
-#question-modal .options button{padding:8px 16px;border-radius:6px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;font-size:13px;cursor:pointer;transition:background .15s}
-#question-modal .options button:hover{background:#1f6feb;color:#fff;border-color:#1f6feb}
-#question-modal .actions{display:flex;justify-content:flex-end;gap:8px}
-#question-modal .actions button{padding:6px 14px;border-radius:6px;border:1px solid #30363d;background:#21262d;color:#8b949e;font-size:12px;cursor:pointer}
-#question-modal .actions button:hover{background:#30363d;color:#c9d1d9}
+/* Inline Question Bubble */
+.msg.question{align-self:flex-start;background:linear-gradient(135deg,#1a1f2e,#1c2333);border:1px solid #30363d;border-left:3px solid #d29922;border-bottom-left-radius:4px;animation:slideIn .3s ease}
+.msg.question .q-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.msg.question .q-icon{width:20px;height:20px;border-radius:50%;background:#d2992233;display:flex;align-items:center;justify-content:center;font-size:12px}
+.msg.question .q-title{font-size:12px;color:#d29922;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.msg.question .q-text{font-size:14px;color:#e6edf3;margin-bottom:12px;line-height:1.5}
+.msg.question .q-options{display:flex;flex-wrap:wrap;gap:8px}
+.msg.question .q-options button{padding:7px 16px;border-radius:8px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;font-size:13px;cursor:pointer;transition:all .15s ease}
+.msg.question .q-options button:hover{background:#d2992233;border-color:#d29922;color:#d29922;transform:translateY(-1px)}
+.msg.question .q-options button.selected{background:#d29922;border-color:#d29922;color:#0d1117;font-weight:600}
+.msg.question .q-answered{font-size:12px;color:#3fb950;margin-top:8px;display:flex;align-items:center;gap:4px}
+.msg.question .q-input-wrap{display:flex;gap:8px;width:100%}
+.msg.question .q-input-wrap input{flex:1;padding:7px 12px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:13px;outline:none;transition:border-color .15s}
+.msg.question .q-input-wrap input:focus{border-color:#d29922}
+.msg.question .q-input-wrap button{padding:7px 16px;border-radius:8px;border:1px solid #d29922;background:#d2992233;color:#d29922;font-size:13px;cursor:pointer;transition:all .15s}
+.msg.question .q-input-wrap button:hover{background:#d29922;color:#0d1117}
+@keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -163,16 +186,6 @@ footer button:disabled{opacity:.5;cursor:not-allowed}
     <button id="task-btn" onclick="submitTask()" style="border-color:#30363d;background:#21262d;font-size:12px">Task</button>
   </footer>
 </div>
-<div id="question-overlay">
-  <div id="question-modal">
-    <h3>Agent Question</h3>
-    <p id="question-text"></p>
-    <div class="options" id="question-options"></div>
-    <div class="actions">
-      <button onclick="dismissQuestion()">Dismiss</button>
-    </div>
-  </div>
-</div>
 <script>
 const chat=document.getElementById('chat');
 const input=document.getElementById('input');
@@ -193,14 +206,60 @@ function addMsg(role,text){
   return d;
 }
 
-function addTool(text,cls){
+function addToolCard(toolCallId,name,status){
   const d=document.createElement('div');
-  d.className='tool';
-  const iconCls=cls||'start';
-  d.innerHTML='<span class="icon '+iconCls+'">'+text.split(' ')[0]+'</span><span class="name">'+text.split(' ').slice(1).join(' ')+'</span>';
+  d.className='tool-card';
+  d.id='tc-'+toolCallId;
+  const iconMap={running:'\u25b6',ok:'\u2713',fail:'\u2717',stop:'\u25a0'};
+  const icon=iconMap[status]||'\u25b6';
+  d.innerHTML='<div class="tc-header" onclick="this.parentElement.classList.toggle(\\'expanded\\')">'+
+    '<div class="tc-icon '+status+'">'+icon+'</div>'+
+    '<div class="tc-name">'+escapeHtml(name)+'</div>'+
+    '<div class="tc-status '+status+'">'+status.toUpperCase()+'</div>'+
+    '<div class="tc-chevron">\u25bc</div>'+
+    '</div>'+
+    '<div class="tc-body"><div class="tc-output"></div></div>';
   chat.appendChild(d);
   chat.scrollTop=chat.scrollHeight;
   return d;
+}
+
+function appendToolOutput(toolCallId,text){
+  const card=document.getElementById('tc-'+toolCallId);
+  if(!card)return;
+  const out=card.querySelector('.tc-output');
+  if(!out)return;
+  if(text==='[binary output]'){
+    out.className='tc-output binary';
+    out.textContent='[binary data - cannot display]';
+  }else{
+    out.textContent+=(out.textContent?'\\n':'')+text;
+  }
+  card.classList.add('expanded');
+  chat.scrollTop=chat.scrollHeight;
+}
+
+function updateToolStatus(toolCallId,status){
+  const card=document.getElementById('tc-'+toolCallId);
+  if(!card)return;
+  const icon=card.querySelector('.tc-icon');
+  const st=card.querySelector('.tc-status');
+  const iconMap={ok:'\u2713',fail:'\u2717',stop:'\u25a0'};
+  icon.className='tc-icon '+status;
+  icon.textContent=iconMap[status]||'\u25a0';
+  st.className='tc-status '+status;
+  st.textContent=status.toUpperCase();
+  // Auto-collapse successful tools after 2s
+  if(status==='ok'){
+    setTimeout(()=>card.classList.remove('expanded'),2000);
+  }
+  // Show empty body if no output
+  const body=card.querySelector('.tc-body');
+  const out=card.querySelector('.tc-output');
+  if(out&&!out.textContent.trim()){
+    out.className='tc-empty';
+    out.textContent='no output';
+  }
 }
 
 function addDlBtn(parent,path,label){
@@ -328,11 +387,11 @@ async function send(){
           rawText+=d.text;
           renderMd();
         }else if(d.type==='tool_start'){
-          addTool('[Tool] '+d.name);
+          addToolCard(d.tool_call_id,d.name,'running');
         }else if(d.type==='tool_result'){
-          addTool(d.status+' '+d.name,d.status==='[OK]'?'ok':d.status==='[FAIL]'?'fail':'start');
+          updateToolStatus(d.tool_call_id,d.status.replace('[','').replace(']','').toLowerCase());
         }else if(d.type==='tool_output'){
-          addTool('  '+d.text.substring(0,120),'start');
+          appendToolOutput(d.tool_call_id,d.text);
         }
       }
       chat.scrollTop=chat.scrollHeight;
@@ -422,51 +481,66 @@ async function submitTask(){
 
 loadActiveSession();
 
-// ---- Human-in-the-loop (Polling) ----
+// ---- Inline Question (Human-in-the-loop) ----
 
 let currentQuestionTaskId=null;
+let currentQuestionBubble=null;
 
 async function checkPendingQuestions(){
   try{
     const r=await fetch('/api/tasks/pending-questions');
+    if(!r.ok)return;
     const questions=await r.json();
     const keys=Object.keys(questions);
     if(keys.length>0&&!currentQuestionTaskId){
       const taskId=keys[0];
       const q=questions[taskId];
-      showQuestion(taskId,q.question,q.options||[]);
+      showInlineQuestion(taskId,q.question,q.options||[]);
     }
   }catch(e){console.error('checkPendingQuestions:',e);}
 }
 
-function showQuestion(taskId,question,options){
+function showInlineQuestion(taskId,question,options){
   currentQuestionTaskId=taskId;
-  document.getElementById('question-text').textContent=question;
-  const optsDiv=document.getElementById('question-options');
-  optsDiv.innerHTML='';
+  const d=document.createElement('div');
+  d.className='msg question';
+  d.id='question-'+taskId;
+  let optionsHtml='';
   if(options.length>0){
-    options.forEach(opt=>{
-      const btn=document.createElement('button');
-      btn.textContent=opt;
-      btn.onclick=()=>respondToQuestion(taskId,opt);
-      optsDiv.appendChild(btn);
-    });
+    optionsHtml='<div class="q-options">'+options.map(o=>
+      '<button onclick="selectOption(\\''+taskId+'\\',\\''+escapeHtml(o).replace(/'/g,"\\\\'")+'\\',this)">'+escapeHtml(o)+'</button>'
+    ).join('')+'</div>';
   }else{
-    const input=document.createElement('input');
-    input.type='text';
-    input.placeholder='Type your response...';
-    input.style.cssText='flex:1;padding:8px 12px;border-radius:6px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:13px;outline:none;width:100%;margin-bottom:12px';
-    input.id='custom-response';
-    optsDiv.appendChild(input);
-    const submitBtn=document.createElement('button');
-    submitBtn.textContent='Submit';
-    submitBtn.onclick=()=>{
-      const val=document.getElementById('custom-response').value.trim();
-      if(val) respondToQuestion(taskId,val);
-    };
-    optsDiv.appendChild(submitBtn);
+    optionsHtml='<div class="q-input-wrap">'+
+      '<input id="q-input-'+taskId+'" type="text" placeholder="Type your response..." onkeydown="if(event.key===\\'Enter\\')submitTextResponse(\\''+taskId+'\\')">'+
+      '<button onclick="submitTextResponse(\\''+taskId+'\\')">Send</button>'+
+      '</div>';
   }
-  document.getElementById('question-overlay').classList.add('show');
+  d.innerHTML='<div class="q-header">'+
+    '<div class="q-icon">?</div>'+
+    '<div class="q-title">Agent needs your input</div>'+
+    '</div>'+
+    '<div class="q-text">'+escapeHtml(question)+'</div>'+
+    optionsHtml;
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
+  currentQuestionBubble=d;
+}
+
+function selectOption(taskId,option,btn){
+  // Mark selected, disable all buttons
+  const d=document.getElementById('question-'+taskId);
+  if(!d)return;
+  const buttons=d.querySelectorAll('.q-options button');
+  buttons.forEach(b=>{b.disabled=true;b.classList.remove('selected')});
+  if(btn&&btn.target)btn.target.classList.add('selected');
+  respondToQuestion(taskId,option);
+}
+
+async function submitTextResponse(taskId){
+  const inp=document.getElementById('q-input-'+taskId);
+  if(!inp||!inp.value.trim())return;
+  respondToQuestion(taskId,inp.value.trim());
 }
 
 async function respondToQuestion(taskId,response){
@@ -476,13 +550,21 @@ async function respondToQuestion(taskId,response){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({response:response})
     });
+    // Mark question as answered
+    const d=document.getElementById('question-'+taskId);
+    if(d){
+      const opts=d.querySelector('.q-options');
+      const inp=d.querySelector('.q-input-wrap');
+      if(opts)opts.style.display='none';
+      if(inp)inp.style.display='none';
+      const answered=document.createElement('div');
+      answered.className='q-answered';
+      answered.innerHTML='&#10003; Answered: '+escapeHtml(response);
+      d.appendChild(answered);
+    }
+    currentQuestionTaskId=null;
+    currentQuestionBubble=null;
   }catch(e){console.error('respondToQuestion:',e);}
-  dismissQuestion();
-}
-
-function dismissQuestion(){
-  document.getElementById('question-overlay').classList.remove('show');
-  currentQuestionTaskId=null;
 }
 
 setInterval(checkPendingQuestions,5000);
@@ -615,6 +697,8 @@ def create_app(
 
             _last_summary: str | None = agent.state.summary
             full_reply = ""
+            # Track active tool calls for grouping
+            tool_call_names: dict[str, str] = {}
             async for evt in agent.reply_stream(
                 UserMsg("user", content),
             ):
@@ -633,17 +717,30 @@ def create_app(
                     full_reply += evt.delta
                     yield _sse({"type": "text", "text": evt.delta})
                 elif evt.type == EventType.TOOL_CALL_START:
+                    tid = evt.tool_call_id
+                    tname = evt.tool_call_name
+                    tool_call_names[tid] = tname
                     yield _sse({
                         "type": "tool_start",
-                        "name": evt.tool_call_name,
+                        "tool_call_id": tid,
+                        "name": tname,
                     })
                 elif evt.type == EventType.TOOL_RESULT_TEXT_DELTA and evt.delta:
+                    output = evt.delta.strip()
+                    # Detect binary content
+                    if _is_binary(output):
+                        output = "[binary output]"
+                    elif len(output) > 300:
+                        output = output[:300] + "..."
                     yield _sse({
                         "type": "tool_output",
-                        "text": evt.delta.strip()[:200],
+                        "tool_call_id": evt.tool_call_id,
+                        "text": output,
                     })
                 elif evt.type == EventType.TOOL_RESULT_END:
+                    tid = evt.tool_call_id
                     state = evt.state
+                    tname = tool_call_names.get(tid, "unknown")
                     status_map = {
                         "SUCCESS": "[OK]",
                         "ERROR": "[FAIL]",
@@ -652,7 +749,8 @@ def create_app(
                     }
                     yield _sse({
                         "type": "tool_result",
-                        "name": state,
+                        "tool_call_id": tid,
+                        "name": tname,
                         "status": status_map.get(state, "[??]"),
                     })
 
@@ -668,6 +766,8 @@ def create_app(
         )
 
     # --- Async Tasks ---
+    # NOTE: Static routes must be registered BEFORE parameterized routes
+    # to avoid FastAPI matching "pending-questions" as a task_id.
 
     @app.post("/api/tasks")
     async def submit_task(request: dict) -> dict:
@@ -690,6 +790,24 @@ def create_app(
             "status_url": f"/api/tasks/{task.task_id}",
         }
 
+    @app.get("/api/tasks")
+    async def list_tasks() -> list[dict]:
+        """List all tasks, newest first."""
+        if not task_manager:
+            raise HTTPException(
+                status_code=501,
+                detail="Task manager not configured",
+            )
+        from dataclasses import asdict
+        return [asdict(t) for t in task_manager.list_all()]
+
+    @app.get("/api/tasks/pending-questions")
+    async def get_pending_questions():
+        """Get all pending questions waiting for user input."""
+        from app.tools import get_pending_questions
+
+        return get_pending_questions()
+
     @app.get("/api/tasks/{task_id}")
     async def get_task(task_id: str) -> dict:
         """Get task status and result by ID."""
@@ -706,17 +824,6 @@ def create_app(
             )
         from dataclasses import asdict
         return asdict(task)
-
-    @app.get("/api/tasks")
-    async def list_tasks() -> list[dict]:
-        """List all tasks, newest first."""
-        if not task_manager:
-            raise HTTPException(
-                status_code=501,
-                detail="Task manager not configured",
-            )
-        from dataclasses import asdict
-        return [asdict(t) for t in task_manager.list_all()]
 
     @app.delete("/api/tasks/{task_id}")
     async def cancel_task(task_id: str) -> dict:
@@ -736,6 +843,22 @@ def create_app(
             task_manager.update(task_id, status="cancelled")
         task_manager.delete(task_id)
         return {"task_id": task_id, "status": "cancelled"}
+
+    @app.post("/api/tasks/{task_id}/respond")
+    async def respond_to_task(task_id: str, request: Request):
+        """Respond to a task waiting for user input."""
+        from app.tools import set_user_response
+
+        body = await request.json()
+        response = body.get("response", "")
+        success = set_user_response(task_id, response)
+        if success:
+            return {"status": "ok", "message": "Response received"}
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="No pending question found for this task_id",
+            )
 
     @app.get("/api/tasks/{task_id}/stream")
     async def stream_task_progress(task_id: str) -> StreamingResponse:
@@ -782,29 +905,6 @@ def create_app(
             generate(),
             media_type="text/event-stream",
         )
-
-    @app.post("/api/tasks/{task_id}/respond")
-    async def respond_to_task(task_id: str, request: Request):
-        """Respond to a task waiting for user input."""
-        from app.tools import set_user_response
-
-        body = await request.json()
-        response = body.get("response", "")
-        success = set_user_response(task_id, response)
-        if success:
-            return {"status": "ok", "message": "Response received"}
-        else:
-            raise HTTPException(
-                status_code=404,
-                detail="No pending question found for this task_id",
-            )
-
-    @app.get("/api/tasks/pending-questions")
-    async def get_pending_questions():
-        """Get all pending questions waiting for user input."""
-        from app.tools import get_pending_questions
-
-        return get_pending_questions()
 
     # ---- Session API ----
 
@@ -1000,6 +1100,20 @@ def _sse_error(message: str) -> str:
     return _sse({"type": "error", "text": message})
 
 
+def _is_binary(text: str) -> bool:
+    """Detect if text contains binary data."""
+    if not text:
+        return False
+    # Check for null bytes or high concentration of non-printable chars
+    non_printable = sum(1 for c in text if ord(c) < 9 or (13 < ord(c) < 32))
+    if non_printable > len(text) * 0.3:
+        return True
+    # Check for typical binary markers
+    if "\x00" in text:
+        return True
+    return False
+
+
 def main() -> None:
     """Start the Agent Service."""
     import uvicorn
@@ -1025,7 +1139,7 @@ def main() -> None:
         set_memory_store(memory)
         set_retriever(retriever)
 
-        toolkit = await build_toolkit(config)
+        toolkit, mcp_clients = await build_toolkit(config)
         agent = await build_agent(
             config, toolkit, store=store, memory=memory,
         )
@@ -1056,7 +1170,14 @@ def main() -> None:
         )
         uvicorn_config = uvicorn.Config(app, host="0.0.0.0", port=8000)
         server = uvicorn.Server(uvicorn_config)
-        await server.serve()
+        try:
+            await server.serve()
+        finally:
+            for mcp in mcp_clients:
+                try:
+                    await mcp.close()
+                except Exception:
+                    pass
 
     import asyncio
 

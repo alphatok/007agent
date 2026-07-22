@@ -41,7 +41,8 @@ SYSTEM_PROMPT = (
     "1. Use plan_task to break down the task into subtasks before starting\n"
     "2. Execute each subtask in order\n"
     "3. Call report_progress after each subtask completes\n"
-    "4. If a subtask fails, try alternative approaches before giving up"
+    "4. Use ask_user ONLY for critical decisions during complex tasks - "
+    "never for simple conversation, greetings, or clarifications"
 )
 
 

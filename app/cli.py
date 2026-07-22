@@ -61,6 +61,7 @@ async def _stream_reply(agent: Agent, user_input: str) -> None:
     tool_names: dict[str, str] = {}
     tool_result_lines: dict[str, int] = {}
     _last_summary: str | None = agent.state.summary
+    full_response: str = ""
 
     async for evt in agent.reply_stream(UserMsg("user", user_input)):
         # Detect context compaction
@@ -156,7 +157,7 @@ def main() -> None:
         set_memory_store(memory)
         set_retriever(retriever)
 
-        toolkit = await build_toolkit(config)
+        toolkit, mcp_clients = await build_toolkit(config)
         agent = await build_agent(config, toolkit, store=store, memory=memory)
 
         # Session management
@@ -180,7 +181,15 @@ def main() -> None:
             else:
                 store.create_session(name="CLI Session")
 
-        await run_cli(agent)
+        try:
+            await run_cli(agent)
+        finally:
+            # Cleanup MCP clients
+            for mcp in mcp_clients:
+                try:
+                    await mcp.close()
+                except Exception:
+                    pass
 
         # Cleanup on exit
         if config.persistence_mode != "none":
