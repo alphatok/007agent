@@ -7,10 +7,14 @@ Provides REST, SSE endpoints and a built-in chat web UI with:
 """
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
@@ -18,6 +22,7 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from agentscope.event import EventType
 from agentscope.message import UserMsg
 
+from app.checkpoint import load_checkpoint
 from app.task_manager import TaskManager
 
 if TYPE_CHECKING:
@@ -106,6 +111,26 @@ footer button:disabled{opacity:.5;cursor:not-allowed}
 #session-list::-webkit-scrollbar{width:4px}
 #session-list::-webkit-scrollbar-track{background:transparent}
 #session-list::-webkit-scrollbar-thumb{background:#30363d;border-radius:2px}
+/* Progress Bar */
+#progress-container{display:none;padding:0 20px;border-bottom:1px solid #30363d;background:#161b22}
+#progress-container.visible{display:block}
+#progress-bar-wrap{width:100%;height:6px;background:#21262d;border-radius:3px;margin:10px 0;overflow:hidden}
+#progress-bar{height:100%;background:linear-gradient(90deg,#238636,#3fb950);border-radius:3px;width:0%;transition:width .3s ease}
+#progress-text{font-size:12px;color:#8b949e;margin-bottom:6px;display:flex;justify-content:space-between}
+#progress-text .step{color:#c9d1d9}
+#progress-text .pct{color:#3fb950;font-weight:600}
+/* Human-in-the-loop Modal */
+#question-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.65);z-index:1000;justify-content:center;align-items:center}
+#question-overlay.show{display:flex}
+#question-modal{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 4px 24px rgba(0,0,0,.5)}
+#question-modal h3{font-size:16px;color:#f0f6fc;margin-bottom:12px;font-weight:600}
+#question-modal p{font-size:14px;color:#c9d1d9;margin-bottom:16px;line-height:1.5}
+#question-modal .options{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+#question-modal .options button{padding:8px 16px;border-radius:6px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;font-size:13px;cursor:pointer;transition:background .15s}
+#question-modal .options button:hover{background:#1f6feb;color:#fff;border-color:#1f6feb}
+#question-modal .actions{display:flex;justify-content:flex-end;gap:8px}
+#question-modal .actions button{padding:6px 14px;border-radius:6px;border:1px solid #30363d;background:#21262d;color:#8b949e;font-size:12px;cursor:pointer}
+#question-modal .actions button:hover{background:#30363d;color:#c9d1d9}
 </style>
 </head>
 <body>
@@ -122,11 +147,31 @@ footer button:disabled{opacity:.5;cursor:not-allowed}
     <h1>AgentScope Chat</h1>
     <span>DeepSeek V4 Pro</span>
   </header>
+  <div id="progress-container">
+    <div id="progress-text">
+      <span class="step">Initializing...</span>
+      <span class="pct">0%</span>
+    </div>
+    <div id="progress-bar-wrap">
+      <div id="progress-bar"></div>
+    </div>
+  </div>
   <div id="chat"></div>
   <footer>
     <input id="input" placeholder="Type a message..." autofocus>
     <button id="send" onclick="send()">Send</button>
+    <button id="task-btn" onclick="submitTask()" style="border-color:#30363d;background:#21262d;font-size:12px">Task</button>
   </footer>
+</div>
+<div id="question-overlay">
+  <div id="question-modal">
+    <h3>Agent Question</h3>
+    <p id="question-text"></p>
+    <div class="options" id="question-options"></div>
+    <div class="actions">
+      <button onclick="dismissQuestion()">Dismiss</button>
+    </div>
+  </div>
 </div>
 <script>
 const chat=document.getElementById('chat');
@@ -302,7 +347,145 @@ async function send(){
   input.focus();
 }
 
+// ---- Progress Bar ----
+
+function showProgress(){
+  document.getElementById('progress-container').classList.add('visible');
+}
+
+function updateProgress(pct,step){
+  document.getElementById('progress-bar').style.width=pct+'%';
+  document.getElementById('progress-text').querySelector('.step').textContent=step||'Working...';
+  document.getElementById('progress-text').querySelector('.pct').textContent=pct+'%';
+}
+
+function hideProgress(){
+  document.getElementById('progress-container').classList.remove('visible');
+  document.getElementById('progress-bar').style.width='0%';
+}
+
+// ---- Async Task ----
+
+async function submitTask(){
+  const text=input.value.trim();
+  if(!text||busy)return;
+  busy=true;
+  const taskBtn=document.getElementById('task-btn');
+  taskBtn.disabled=true;
+  btn.disabled=true;
+  addMsg('user',text);
+  input.value='';
+
+  try{
+    const r=await fetch('/api/tasks',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({content:text})
+    });
+    const data=await r.json();
+    const taskId=data.task_id;
+
+    // Connect to SSE for progress
+    showProgress();
+    updateProgress(0,'Task submitted...');
+
+    const evtSource=new EventSource('/api/tasks/'+taskId+'/stream');
+    evtSource.onmessage=function(e){
+      const d=JSON.parse(e.data);
+      if(d.type==='progress'){
+        updateProgress(d.progress,d.current_step||'Working...');
+      }else if(d.type==='done'){
+        updateProgress(100,'Completed');
+        setTimeout(hideProgress,2000);
+        addMsg('agent',d.result||'Task completed');
+        evtSource.close();
+        loadSessions();
+      }else if(d.type==='error'){
+        updateProgress(0,'Error: '+d.error);
+        setTimeout(hideProgress,3000);
+        evtSource.close();
+      }
+    };
+    evtSource.onerror=function(){
+      evtSource.close();
+      hideProgress();
+    };
+  }catch(e){
+    hideProgress();
+    addMsg('agent','Error: '+e.message);
+  }
+  busy=false;
+  btn.disabled=false;
+  taskBtn.disabled=false;
+  input.focus();
+}
+
 loadActiveSession();
+
+// ---- Human-in-the-loop (Polling) ----
+
+let currentQuestionTaskId=null;
+
+async function checkPendingQuestions(){
+  try{
+    const r=await fetch('/api/tasks/pending-questions');
+    const questions=await r.json();
+    const keys=Object.keys(questions);
+    if(keys.length>0&&!currentQuestionTaskId){
+      const taskId=keys[0];
+      const q=questions[taskId];
+      showQuestion(taskId,q.question,q.options||[]);
+    }
+  }catch(e){console.error('checkPendingQuestions:',e);}
+}
+
+function showQuestion(taskId,question,options){
+  currentQuestionTaskId=taskId;
+  document.getElementById('question-text').textContent=question;
+  const optsDiv=document.getElementById('question-options');
+  optsDiv.innerHTML='';
+  if(options.length>0){
+    options.forEach(opt=>{
+      const btn=document.createElement('button');
+      btn.textContent=opt;
+      btn.onclick=()=>respondToQuestion(taskId,opt);
+      optsDiv.appendChild(btn);
+    });
+  }else{
+    const input=document.createElement('input');
+    input.type='text';
+    input.placeholder='Type your response...';
+    input.style.cssText='flex:1;padding:8px 12px;border-radius:6px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:13px;outline:none;width:100%;margin-bottom:12px';
+    input.id='custom-response';
+    optsDiv.appendChild(input);
+    const submitBtn=document.createElement('button');
+    submitBtn.textContent='Submit';
+    submitBtn.onclick=()=>{
+      const val=document.getElementById('custom-response').value.trim();
+      if(val) respondToQuestion(taskId,val);
+    };
+    optsDiv.appendChild(submitBtn);
+  }
+  document.getElementById('question-overlay').classList.add('show');
+}
+
+async function respondToQuestion(taskId,response){
+  try{
+    await fetch('/api/tasks/'+encodeURIComponent(taskId)+'/respond',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({response:response})
+    });
+  }catch(e){console.error('respondToQuestion:',e);}
+  dismissQuestion();
+}
+
+function dismissQuestion(){
+  document.getElementById('question-overlay').classList.remove('show');
+  currentQuestionTaskId=null;
+}
+
+setInterval(checkPendingQuestions,5000);
 </script>
 </body>
 </html>"""
@@ -554,6 +737,75 @@ def create_app(
         task_manager.delete(task_id)
         return {"task_id": task_id, "status": "cancelled"}
 
+    @app.get("/api/tasks/{task_id}/stream")
+    async def stream_task_progress(task_id: str) -> StreamingResponse:
+        """Stream task progress via SSE."""
+        if not task_manager:
+            raise HTTPException(
+                status_code=501,
+                detail="Task manager not configured",
+            )
+        task = task_manager.get(task_id)
+        if task is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task '{task_id}' not found",
+            )
+
+        async def generate():
+            queue = task_manager.progress_queue(task_id)
+            # Send initial state
+            yield _sse({
+                "type": "progress",
+                "progress": task.progress,
+                "current_step": task.current_step,
+                "status": task.status,
+            })
+            completed_steps = 0
+            try:
+                while True:
+                    event = await queue.get()
+                    # Support parallel subtask progress with step_id
+                    if event.get("step_id"):
+                        completed_steps += 1
+                        overall = int(completed_steps / max(event.get("total_steps", 1), 1) * 100)
+                        event["progress"] = overall
+                    yield _sse(event)
+                    if event["type"] in ("done", "error"):
+                        break
+            except asyncio.CancelledError:
+                yield _sse({"type": "error", "error": "Connection closed"})
+            except Exception as e:
+                yield _sse({"type": "error", "error": str(e)})
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+        )
+
+    @app.post("/api/tasks/{task_id}/respond")
+    async def respond_to_task(task_id: str, request: Request):
+        """Respond to a task waiting for user input."""
+        from app.tools import set_user_response
+
+        body = await request.json()
+        response = body.get("response", "")
+        success = set_user_response(task_id, response)
+        if success:
+            return {"status": "ok", "message": "Response received"}
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="No pending question found for this task_id",
+            )
+
+    @app.get("/api/tasks/pending-questions")
+    async def get_pending_questions():
+        """Get all pending questions waiting for user input."""
+        from app.tools import get_pending_questions
+
+        return get_pending_questions()
+
     # ---- Session API ----
 
     @app.get("/api/sessions")
@@ -787,6 +1039,18 @@ def main() -> None:
             _write_active_session(config.data_dir, session_id)
         object.__setattr__(agent, "_active_session_id", session_id)
         tm = TaskManager()
+
+        # Check for unfinished tasks at startup
+        pending_tasks = [t for t in tm.list_all() if t.status == "pending"]
+        if pending_tasks:
+            logger.info(f"Found {len(pending_tasks)} pending tasks from previous session")
+            # Try to resume each pending task
+            for task in pending_tasks:
+                checkpoint = load_checkpoint(config.data_dir, task.task_id)
+                if checkpoint:
+                    logger.info(f"Resuming task {task.task_id} from checkpoint (step {checkpoint.step_index})")
+                    tm.resume_task(task.task_id, agent)
+
         app = create_app(
             agent, task_manager=tm, store=store, memory=memory,
         )

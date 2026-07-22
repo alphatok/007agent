@@ -35,6 +35,13 @@ SYSTEM_PROMPT = (
     "specific tasks like code review and test generation. "
     "When a task matches a skill's description, use the Skill tool to "
     "read the full instructions and follow them precisely."
+    "\n\n"
+    "## Long-Running Task Guidelines\n"
+    "When working on complex, multi-step tasks:\n"
+    "1. Use plan_task to break down the task into subtasks before starting\n"
+    "2. Execute each subtask in order\n"
+    "3. Call report_progress after each subtask completes\n"
+    "4. If a subtask fails, try alternative approaches before giving up"
 )
 
 

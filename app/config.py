@@ -74,6 +74,16 @@ class Config:
     embedding_model_name: str = "BAAI/bge-small-zh-v1.5"
     """FastEmbed model name (only used when embedding_backend=fastembed)."""
 
+    # ---- Tool Retry ----
+    tool_retry_max: int = 3
+    """Maximum number of retries for tool calls."""
+
+    tool_retry_backoff: float = 2.0
+    """Backoff multiplier for tool retry delays."""
+
+    tool_retry_initial_delay: float = 1.0
+    """Initial delay in seconds before first tool retry."""
+
 
 def load_config() -> Config:
     """Load configuration from environment variables.
@@ -120,5 +130,12 @@ def load_config() -> Config:
         embedding_backend=os.getenv("EMBEDDING_BACKEND", "fastembed"),
         embedding_model_name=os.getenv(
             "EMBEDDING_MODEL_NAME", "BAAI/bge-small-zh-v1.5"
+        ),
+        tool_retry_max=int(os.getenv("TOOL_RETRY_MAX", "3")),
+        tool_retry_backoff=float(
+            os.getenv("TOOL_RETRY_BACKOFF", "2.0"),
+        ),
+        tool_retry_initial_delay=float(
+            os.getenv("TOOL_RETRY_INITIAL_DELAY", "1.0"),
         ),
     )
