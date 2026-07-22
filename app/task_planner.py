@@ -61,8 +61,8 @@ async def plan_task(
         for i, s in enumerate(steps)
     )
     yield ToolChunk(
-        task_id=task_id,
-        state=ToolResultState.SUCCESS,
+        id=task_id,
+        state='success',
         content=[TextBlock(text=f"Plan created for: {goal}\n{steps_text}")],
         metadata={"plan": {"goal": goal, "steps": [s.__dict__ for s in steps]}},
     )
