@@ -138,7 +138,7 @@ class TestMemoryTools:
         asyncio.run(run())
 
     def test_get_tools(self, temp_dirs: tuple) -> None:
-        """get_memory_tools should return 4 FunctionTools."""
+        """get_memory_tools should return 5 FunctionTools."""
         db_path, zvec_path = temp_dirs
         from app.memory import MemoryStore
         from app.memory_tool import get_memory_tools, set_memory_store
@@ -147,7 +147,7 @@ class TestMemoryTools:
         set_memory_store(store)
 
         tools = get_memory_tools()
-        assert len(tools) == 4
+        assert len(tools) == 5
 
         from agentscope.tool import FunctionTool
         for tool in tools:

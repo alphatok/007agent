@@ -212,6 +212,68 @@ async def _forget_memory(memory_id: str) -> ToolChunk:
         )
 
 
+async def _update_memory(memory_id: str, content: str | None = None,
+                         type: str | None = None,
+                         importance: float | None = None) -> ToolChunk:
+    """Update an existing memory's content, type, or importance.
+
+    Args:
+        memory_id: ID of the memory to update (use list_memories to find IDs).
+        content: New content (optional).
+        type: New type: episodic | semantic | procedural (optional).
+        importance: New importance score 0.0-1.0 (optional).
+    """
+    yield ToolChunk(
+        content=[TextBlock(
+            text=f"[Tool] Updating memory: {memory_id[:8]}..."
+        )],
+        state=ToolResultState.RUNNING,
+    )
+
+    if _store is None:
+        yield ToolChunk(
+            content=[TextBlock(
+                text="[FAIL] Memory store not initialized"
+            )],
+            state=ToolResultState.ERROR,
+        )
+        return
+
+    # Build update kwargs
+    kwargs = {}
+    if content is not None:
+        kwargs["content"] = content
+    if type is not None:
+        kwargs["type"] = type
+    if importance is not None:
+        kwargs["importance"] = importance
+
+    if not kwargs:
+        yield ToolChunk(
+            content=[TextBlock(
+                text="[FAIL] No fields to update (content, type, or importance required)"
+            )],
+            state=ToolResultState.ERROR,
+        )
+        return
+
+    if _store.update_memory(memory_id, **kwargs):
+        yield ToolChunk(
+            content=[TextBlock(
+                text=f"[ OK ] Memory updated: {memory_id[:8]}... "
+                     f"({', '.join(kwargs.keys())})"
+            )],
+            state=ToolResultState.SUCCESS,
+        )
+    else:
+        yield ToolChunk(
+            content=[TextBlock(
+                text=f"[FAIL] Memory not found: {memory_id[:8]}..."
+            )],
+            state=ToolResultState.ERROR,
+        )
+
+
 def get_memory_tools() -> list[FunctionTool]:
     """Return memory-related FunctionTools for the Toolkit."""
     return [
@@ -219,4 +281,5 @@ def get_memory_tools() -> list[FunctionTool]:
         FunctionTool(_add_memory),
         FunctionTool(_list_memories),
         FunctionTool(_forget_memory),
+        FunctionTool(_update_memory),
     ]

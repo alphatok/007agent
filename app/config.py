@@ -84,6 +84,10 @@ class Config:
     tool_retry_initial_delay: float = 1.0
     """Initial delay in seconds before first tool retry."""
 
+    # ---- Workspace ----
+    workspace_root: str = "workspace"
+    """Workspace root directory for file operations. Relative to project root."""
+
 
 def load_config() -> Config:
     """Load configuration from environment variables.
@@ -138,4 +142,5 @@ def load_config() -> Config:
         tool_retry_initial_delay=float(
             os.getenv("TOOL_RETRY_INITIAL_DELAY", "1.0"),
         ),
+        workspace_root=os.getenv("WORKSPACE_ROOT", "workspace"),
     )

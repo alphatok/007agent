@@ -14,3 +14,7 @@ wheels/
 
 # Data directory (persistent storage, logs, tasks)
 data/
+
+# Workspace directory (agent file operations)
+workspace/*
+!workspace/.gitkeep

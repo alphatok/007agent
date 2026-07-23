@@ -43,6 +43,19 @@ SYSTEM_PROMPT = (
     "3. Call report_progress after each subtask completes\n"
     "4. Use ask_user ONLY for critical decisions during complex tasks - "
     "never for simple conversation, greetings, or clarifications"
+    "\n\n"
+    "## Memory Management\n"
+    "You have access to a cross-session memory system. Use it to:\n"
+    "- When the user tells you to remember something (e.g., 'remember my name is XXX', "
+    "'记住我叫XXX'), use add_memory to store it.\n"
+    "- Before answering questions about the user, search memory first with "
+    "search_memory to recall past facts.\n"
+    "- When the user provides updated information, use update_memory to "
+    "modify existing memories instead of creating duplicates.\n"
+    "- Use list_memories to review what you already know about the user.\n"
+    "- Use forget_memory to remove outdated or incorrect memories.\n"
+    "- Memory types: 'semantic' for facts/preferences, 'episodic' for "
+    "events/experiences, 'procedural' for workflows/instructions."
 )
 
 

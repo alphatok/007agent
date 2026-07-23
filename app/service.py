@@ -31,9 +31,6 @@ if TYPE_CHECKING:
     from app.store import SessionStore
     from app.memory import MemoryStore
 
-# Workspace root for file downloads
-WORKSPACE_ROOT = Path.cwd()
-
 # Static files directory
 _STATIC_DIR = Path(__file__).parent / "static"
 
@@ -83,7 +80,7 @@ def create_app(
     Returns:
         FastAPI application with web UI, chat, and file download endpoints.
     """
-    root = workspace_root or WORKSPACE_ROOT
+    root = workspace_root
 
     app = FastAPI(title="AgentScope Agent Service")
 
@@ -644,6 +641,7 @@ def main() -> None:
 
         app = create_app(
             agent, task_manager=tm, store=store, memory=memory,
+            workspace_root=Path(config.workspace_root).resolve(),
         )
         uvicorn_config = uvicorn.Config(app, host="0.0.0.0", port=8000)
         server = uvicorn.Server(uvicorn_config)

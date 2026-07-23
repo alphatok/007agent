@@ -8,10 +8,13 @@ Lifecycle: extract -> consolidate (episodic -> semantic) -> decay (cleanup).
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     pass
@@ -106,7 +109,29 @@ class MemoryStore:
                    source_session_id: str | None = None,
                    metadata: dict | None = None,
                    importance: float = 0.5) -> str:
-        """Add a memory entry. Returns memory_id."""
+        """Add a memory entry. Deduplicates by content. Returns memory_id."""
+        # Dedup: check for exact content match
+        existing = self._conn.execute(
+            "SELECT id, importance, access_count FROM memories WHERE content = ?",
+            (content,),
+        ).fetchone()
+        if existing:
+            # Merge: update importance (take max) and bump access_count
+            new_importance = max(existing["importance"], importance)
+            self._conn.execute(
+                """UPDATE memories
+                   SET importance = ?, access_count = access_count + 1,
+                       updated_at = ?
+                   WHERE id = ?""",
+                (new_importance, _now(), existing["id"]),
+            )
+            self._conn.commit()
+            logger.info(
+                "[Memory] Merged duplicate: '%s...' (id: %s, importance: %.1f)",
+                content[:50], existing["id"][:8], new_importance,
+            )
+            return existing["id"]
+
         memory_id = str(uuid.uuid4())
         now = _now()
         self._conn.execute(
@@ -119,6 +144,10 @@ class MemoryStore:
              importance, now, now),
         )
         self._conn.commit()
+        logger.info(
+            "[Memory] Added %s: '%s...' (id: %s, importance: %.1f)",
+            type, content[:50], memory_id[:8], importance,
+        )
         return memory_id
 
     def get_memory(self, memory_id: str) -> dict | None:
@@ -145,6 +174,10 @@ class MemoryStore:
             "SELECT * FROM memories WHERE id = ?", (memory_id,)
         ).fetchone()
         if mem is None:
+            logger.warning(
+                "[Memory] Update failed: memory not found (id: %s)",
+                memory_id[:8],
+            )
             return False
 
         allowed = {"type", "content", "source_session_id",
@@ -170,19 +203,31 @@ class MemoryStore:
             values,
         )
         self._conn.commit()
+        logger.info(
+            "[Memory] Updated (id: %s, fields: %s)",
+            memory_id[:8], ", ".join(updates.keys()),
+        )
         return True
 
     def delete_memory(self, memory_id: str) -> bool:
         """Delete a memory from SQLite."""
         mem = self._conn.execute(
-            "SELECT id FROM memories WHERE id = ?", (memory_id,)
+            "SELECT id, content FROM memories WHERE id = ?", (memory_id,)
         ).fetchone()
         if mem is None:
+            logger.warning(
+                "[Memory] Delete failed: memory not found (id: %s)",
+                memory_id[:8],
+            )
             return False
         self._conn.execute(
             "DELETE FROM memories WHERE id = ?", (memory_id,)
         )
         self._conn.commit()
+        logger.info(
+            "[Memory] Deleted (id: %s, content: '%s...')",
+            memory_id[:8], mem["content"][:50],
+        )
         return True
 
     def list_memories(self, type: str | None = None,
