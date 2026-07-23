@@ -49,7 +49,12 @@ class MemoryStore:
         self._init_zvec()
 
     def _create_tables(self) -> None:
-        """Create memories table if it doesn't exist."""
+        """Create memories table and indexes.
+
+        Migration order matters: create base table + non-scope indexes first,
+        then migrate to add scope column for existing DBs, then create scope
+        index (safe because scope column is guaranteed to exist by now).
+        """
         self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS memories (
                 id TEXT PRIMARY KEY,
@@ -71,11 +76,15 @@ class MemoryStore:
                 ON memories(importance DESC);
             CREATE INDEX IF NOT EXISTS idx_memories_accessed
                 ON memories(last_accessed_at);
-            CREATE INDEX IF NOT EXISTS idx_memories_scope
-                ON memories(scope, created_at);
         """)
         self._conn.commit()
         self._migrate_add_scope()
+        # Create scope index after migration ensures the column exists
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memories_scope "
+            "ON memories(scope, created_at)"
+        )
+        self._conn.commit()
 
     def _migrate_add_scope(self) -> None:
         """Add scope column for existing databases (migration)."""
