@@ -9,7 +9,9 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter')send()});
 
 function addMsg(role,text){
   const d=document.createElement('div');
-  d.className='msg '+role;
+  // Map backend "assistant" role to "agent" CSS class
+  const cssRole=role==='assistant'?'agent':role;
+  d.className='msg '+cssRole;
   const label=role==='user'?'You':'Agent';
   d.innerHTML='<div class="label">'+label+'</div><div class="content">'+text+'</div>';
   chat.appendChild(d);
@@ -147,7 +149,7 @@ function renderHistory(messages){
   chat.innerHTML='';
   messages.forEach(msg=>{
     const d=addMsg(msg.role,msg.content);
-    if(msg.role==='agent') detectFiles(msg.content,d.querySelector('.content'));
+    if(msg.role==='agent'||msg.role==='assistant') detectFiles(msg.content,d.querySelector('.content'));
   });
 }
 
