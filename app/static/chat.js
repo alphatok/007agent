@@ -76,18 +76,44 @@ function updateToolStatus(toolCallId,status){
   }
 }
 
-function addCompactionNotice(status){
-  const label=status==='compacting'?'History Chats Compacting':'History Chats Compacted';
-  // Update existing compacting notice if present
-  if(status==='completed'){
-    const existing=chat.querySelector('.compaction-notice .cn-text');
-    if(existing){existing.textContent=label;return;}
-  }
+function addCompactionNotice(){
   const d=document.createElement('div');
   d.className='compaction-notice';
-  d.innerHTML='<div class="cn-line"></div><div class="cn-text">'+label+'</div><div class="cn-line"></div>';
+  d.innerHTML='<span class="cn-text">Context Compacted</span>';
   chat.appendChild(d);
   chat.scrollTop=chat.scrollHeight;
+}
+
+// ---- Thinking Bubble ----
+
+function addThinkingBubble(){
+  const d=document.createElement('div');
+  d.className='thinking-bubble';
+  d.innerHTML='<div class="tb-header" onclick="this.parentElement.classList.toggle(\'expanded\')">'+
+    '<div class="tb-icon">💭</div>'+
+    '<div class="tb-label">Thinking...</div>'+
+    '<div class="tb-chevron">▼</div>'+
+    '</div>'+
+    '<div class="tb-body"><div class="tb-content"></div></div>';
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
+  return d;
+}
+
+function updateThinkingBubble(bubble,text){
+  if(!bubble)return;
+  const content=bubble.querySelector('.tb-content');
+  if(content) content.textContent=text;
+  chat.scrollTop=chat.scrollHeight;
+}
+
+function finalizeThinkingBubble(bubble){
+  if(!bubble)return;
+  const label=bubble.querySelector('.tb-label');
+  if(label) label.textContent='Thought for a while';
+  bubble.classList.add('done');
+  // Auto-collapse after 3s
+  setTimeout(()=>bubble.classList.remove('expanded'),3000);
 }
 
 function addDlBtn(parent,path,label){
@@ -198,6 +224,9 @@ async function send(){
   chat.appendChild(agentDiv);
   const contentDiv=agentDiv.querySelector('.content');
   let rawText='';
+  // Thinking bubble
+  let thinkingBubble=null;
+  let thinkingContent='';
   function renderMd(){
     if(rawText) contentDiv.innerHTML=marked.parse(rawText);
   }
@@ -222,6 +251,15 @@ async function send(){
         if(d.type==='text'){
           rawText+=d.text;
           renderMd();
+        }else if(d.type==='thinking_start'){
+          thinkingBubble=addThinkingBubble();
+          thinkingContent='';
+        }else if(d.type==='thinking'){
+          thinkingContent+=d.text;
+          updateThinkingBubble(thinkingBubble,thinkingContent);
+        }else if(d.type==='thinking_end'){
+          if(thinkingBubble) finalizeThinkingBubble(thinkingBubble);
+          thinkingBubble=null;
         }else if(d.type==='tool_start'){
           addToolCard(d.tool_call_id,d.name,'running');
         }else if(d.type==='tool_result'){
@@ -229,7 +267,7 @@ async function send(){
         }else if(d.type==='tool_output'){
           appendToolOutput(d.tool_call_id,d.text);
         }else if(d.type==='compaction'){
-          addCompactionNotice(d.status);
+          addCompactionNotice();
         }
       }
       chat.scrollTop=chat.scrollHeight;

@@ -174,26 +174,33 @@ def create_app(
             full_reply = ""
             # Track active tool calls for grouping
             tool_call_names: dict[str, str] = {}
+            # Track thinking state
+            _thinking_active = False
             async for evt in agent.reply_stream(
                 UserMsg("user", content),
             ):
-                # Detect context compaction
+                # Detect context compaction (only when summary actually changes
+                # from a non-None value, indicating real compaction happened)
                 current_summary = agent.state.summary
-                if current_summary != _last_summary:
+                if (_last_summary is not None
+                        and current_summary != _last_summary
+                        and current_summary):
                     _last_summary = current_summary
-                    if current_summary:
-                        yield _sse({
-                            "type": "compaction",
-                            "status": "compacting",
-                        })
-                        yield _sse({
-                            "type": "compaction",
-                            "status": "completed",
-                        })
+                    yield _sse({"type": "compaction"})
+                elif current_summary is not None:
+                    _last_summary = current_summary
 
                 if evt.type == EventType.TEXT_BLOCK_DELTA and evt.delta:
                     full_reply += evt.delta
                     yield _sse({"type": "text", "text": evt.delta})
+                elif evt.type == EventType.THINKING_BLOCK_START:
+                    _thinking_active = True
+                    yield _sse({"type": "thinking_start"})
+                elif evt.type == EventType.THINKING_BLOCK_DELTA and evt.delta:
+                    yield _sse({"type": "thinking", "text": evt.delta})
+                elif evt.type == EventType.THINKING_BLOCK_END:
+                    _thinking_active = False
+                    yield _sse({"type": "thinking_end"})
                 elif evt.type == EventType.TOOL_CALL_START:
                     tid = evt.tool_call_id
                     tname = evt.tool_call_name
