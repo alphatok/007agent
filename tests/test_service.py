@@ -72,52 +72,34 @@ class TestRouteOrdering:
 
 
 class TestChatPageJsSyntax:
-    """Test that the generated JS in CHAT_PAGE is syntactically valid."""
+    """Test that the chat.js static file is syntactically valid."""
 
     def test_js_syntax_valid(self):
-        """Verify the embedded JavaScript has no syntax errors."""
+        """Verify the chat.js file has no syntax errors."""
         import subprocess
-        import tempfile
         import os
-        import re
+        from pathlib import Path
 
-        from app.service import CHAT_PAGE
-
-        m = re.search(r"<script>(.*?)</script>", CHAT_PAGE, re.DOTALL)
-        assert m is not None, "No <script> tag found in CHAT_PAGE"
-        js = m.group(1)
-
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".js", delete=False,
-        ) as f:
-            f.write(js)
-            tmp_path = f.name
-
-        try:
-            result = subprocess.run(
-                ["node", "--check", tmp_path],
-                capture_output=True, text=True,
-            )
-            assert result.returncode == 0, (
-                f"JS syntax error in CHAT_PAGE:\n{result.stderr}"
-            )
-        finally:
-            os.unlink(tmp_path)
+        js_path = Path(__file__).resolve().parent.parent / "app" / "static" / "chat.js"
+        result = subprocess.run(
+            ["node", "--check", str(js_path)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, (
+            f"JS syntax error in chat.js:\n{result.stderr}"
+        )
 
     def test_js_no_unescaped_single_quotes_in_strings(self):
-        """Verify Python string escaping doesn't break JS single-quoted strings.
+        """Verify toggle('expanded') uses properly escaped quotes.
 
-        Regression: \\' in Python \"\"\"...\"\"\" becomes just ' in output,
-        which can break JS single-quoted strings like toggle('expanded').
+        Regression: escaped single quotes in JS strings should work correctly.
         """
-        import re
+        from pathlib import Path
 
-        from app.service import CHAT_PAGE
+        js_path = Path(__file__).resolve().parent.parent / "app" / "static" / "chat.js"
+        js = js_path.read_text(encoding="utf-8")
 
-        m = re.search(r"<script>(.*?)</script>", CHAT_PAGE, re.DOTALL)
-        js = m.group(1)
-
-        # Check that toggle('expanded') appears correctly
+        # Check that toggle('expanded') appears correctly with escaped quotes
         assert "toggle(\\'expanded\\')" in js, (
             "toggle needs escaped quotes: toggle(\\'expanded\\')"
         )
