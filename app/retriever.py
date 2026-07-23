@@ -61,7 +61,8 @@ class HybridRetriever:
 
     def search(self, query: str, top_k: int = 10,
                memory_types: list[str] | None = None,
-               min_importance: float = 0.0) -> list[dict]:
+               min_importance: float = 0.0,
+               scope: str | None = None) -> list[dict]:
         """Search memories with zvec hybrid search (vector + FTS).
 
         Falls back to SQLite LIKE when zvec or embedding is unavailable.
@@ -71,6 +72,7 @@ class HybridRetriever:
             top_k: Maximum number of results.
             memory_types: Optional filter by memory type(s).
             min_importance: Minimum importance filter.
+            scope: Optional filter by scope ('global' | 'session').
 
         Returns:
             List of memory dicts sorted by relevance.
@@ -83,7 +85,7 @@ class HybridRetriever:
         if self._zvec_collection is not None and self._embedding_provider is not None:
             try:
                 return self._zvec_search(query, top_k, memory_types,
-                                         min_importance)
+                                         min_importance, scope)
             except Exception as e:
                 logger.debug(
                     "[Retriever] zvec search failed, falling back to SQLite: %s", e,
@@ -91,11 +93,12 @@ class HybridRetriever:
 
         # Fallback: SQLite LIKE keyword search
         return self._sqlite_search(query, top_k, memory_types,
-                                   min_importance)
+                                   min_importance, scope)
 
     def _zvec_search(self, query: str, top_k: int,
                      memory_types: list[str] | None,
-                     min_importance: float) -> list[dict]:
+                     min_importance: float,
+                     scope: str | None = None) -> list[dict]:
         """Hybrid search using zvec MultiQuery (vector + FTS)."""
         import zvec
 
@@ -119,6 +122,8 @@ class HybridRetriever:
             filter_parts.append(f"({type_conditions})")
         if min_importance > 0:
             filter_parts.append(f"importance >= {min_importance}")
+        if scope:
+            filter_parts.append(f'scope == "{scope}"')
 
         filter_expr = " AND ".join(filter_parts) if filter_parts else None
 
@@ -147,7 +152,8 @@ class HybridRetriever:
 
     def _sqlite_search(self, query: str, top_k: int,
                        memory_types: list[str] | None,
-                       min_importance: float) -> list[dict]:
+                       min_importance: float,
+                       scope: str | None = None) -> list[dict]:
         """Fallback keyword search using SQLite LIKE."""
         conn = sqlite3.connect(self._db_path)
         conn.row_factory = sqlite3.Row
@@ -167,6 +173,10 @@ class HybridRetriever:
         if min_importance > 0:
             conditions.append("importance >= ?")
             params.append(min_importance)
+
+        if scope:
+            conditions.append("scope = ?")
+            params.append(scope)
 
         where = " AND ".join(conditions) if conditions else "1=1"
         sql = f"""SELECT * FROM memories

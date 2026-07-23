@@ -2,6 +2,7 @@
 
 Memory is stored in SQLite (metadata) with zvec for vector + FTS search.
 Three memory types: episodic, semantic, procedural.
+Two scopes: 'global' (cross-session) | 'session' (session-scoped).
 
 Lifecycle: extract -> consolidate (episodic -> semantic) -> decay (cleanup).
 """
@@ -54,6 +55,7 @@ class MemoryStore:
                 id TEXT PRIMARY KEY,
                 type TEXT NOT NULL,
                 content TEXT NOT NULL,
+                scope TEXT NOT NULL DEFAULT 'global',
                 source_session_id TEXT,
                 metadata TEXT,
                 importance REAL DEFAULT 0.5,
@@ -69,8 +71,22 @@ class MemoryStore:
                 ON memories(importance DESC);
             CREATE INDEX IF NOT EXISTS idx_memories_accessed
                 ON memories(last_accessed_at);
+            CREATE INDEX IF NOT EXISTS idx_memories_scope
+                ON memories(scope, created_at);
         """)
         self._conn.commit()
+        self._migrate_add_scope()
+
+    def _migrate_add_scope(self) -> None:
+        """Add scope column for existing databases (migration)."""
+        try:
+            self._conn.execute(
+                "ALTER TABLE memories ADD COLUMN scope TEXT NOT NULL DEFAULT 'global'"
+            )
+            self._conn.commit()
+            logger.info("[Memory] Migration: added scope column")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
     def _init_zvec(self) -> None:
         """Initialize zvec collection for vector + FTS."""
@@ -108,8 +124,18 @@ class MemoryStore:
     def add_memory(self, type: str, content: str,
                    source_session_id: str | None = None,
                    metadata: dict | None = None,
-                   importance: float = 0.5) -> str:
-        """Add a memory entry. Deduplicates by content. Returns memory_id."""
+                   importance: float = 0.5,
+                   scope: str = "global") -> str:
+        """Add a memory entry. Deduplicates by content. Returns memory_id.
+
+        Args:
+            type: Memory type: episodic | semantic | procedural.
+            content: Memory content.
+            source_session_id: Session that created this memory.
+            metadata: Optional JSON metadata.
+            importance: Importance score 0.0-1.0.
+            scope: 'global' (cross-session) or 'session' (session-scoped).
+        """
         # Dedup: check for exact content match
         existing = self._conn.execute(
             "SELECT id, importance, access_count FROM memories WHERE content = ?",
@@ -136,17 +162,17 @@ class MemoryStore:
         now = _now()
         self._conn.execute(
             """INSERT INTO memories
-               (id, type, content, source_session_id, metadata,
+               (id, type, content, scope, source_session_id, metadata,
                 importance, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (memory_id, type, content, source_session_id,
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (memory_id, type, content, scope, source_session_id,
              json.dumps(metadata or {}, ensure_ascii=False),
              importance, now, now),
         )
         self._conn.commit()
         logger.info(
-            "[Memory] Added %s: '%s...' (id: %s, importance: %.1f)",
-            type, content[:50], memory_id[:8], importance,
+            "[Memory] Added %s (scope=%s): '%s...' (id: %s, importance: %.1f)",
+            type, scope, content[:50], memory_id[:8], importance,
         )
         return memory_id
 
@@ -181,7 +207,7 @@ class MemoryStore:
             return False
 
         allowed = {"type", "content", "source_session_id",
-                   "metadata", "importance"}
+                   "metadata", "importance", "scope"}
         updates = {}
         for key, value in kwargs.items():
             if key in allowed:
@@ -231,23 +257,33 @@ class MemoryStore:
         return True
 
     def list_memories(self, type: str | None = None,
+                      scope: str | None = None,
                       limit: int = 50) -> list[dict]:
-        """List memories, optionally filtered by type."""
+        """List memories, optionally filtered by type and/or scope.
+
+        Args:
+            type: Filter by memory type (episodic | semantic | procedural).
+            scope: Filter by scope ('global' | 'session') or None for all.
+            limit: Maximum results.
+        """
+        conditions = []
+        params = []
         if type:
-            rows = self._conn.execute(
-                """SELECT * FROM memories
-                   WHERE type = ?
-                   ORDER BY created_at DESC
-                   LIMIT ?""",
-                (type, limit),
-            ).fetchall()
-        else:
-            rows = self._conn.execute(
-                """SELECT * FROM memories
-                   ORDER BY created_at DESC
-                   LIMIT ?""",
-                (limit,),
-            ).fetchall()
+            conditions.append("type = ?")
+            params.append(type)
+        if scope:
+            conditions.append("scope = ?")
+            params.append(scope)
+
+        where = " AND ".join(conditions) if conditions else "1=1"
+        params.append(limit)
+        rows = self._conn.execute(
+            f"""SELECT * FROM memories
+                WHERE {where}
+                ORDER BY created_at DESC
+                LIMIT ?""",
+            params,
+        ).fetchall()
         return [dict(r) for r in rows]
 
     # ---- Memory Lifecycle ----

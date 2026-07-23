@@ -1,4 +1,4 @@
-"""Memory tools for Agent — search, add, list, forget memories.
+"""Memory tools for Agent — search, add, list, update, forget memories.
 
 These are registered as FunctionTools so the Agent can call them
 directly to manage its cross-session memory.
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 _store: "MemoryStore | None" = None
 _retriever: "HybridRetriever | None" = None
+_current_session_id: str | None = None
 
 
 def set_memory_store(store: "MemoryStore") -> None:
@@ -32,17 +33,25 @@ def set_retriever(retriever: "HybridRetriever") -> None:
     _retriever = retriever
 
 
+def set_current_session_id(session_id: str | None) -> None:
+    """Set the current session ID for session-scoped memories."""
+    global _current_session_id
+    _current_session_id = session_id
+
+
 async def _search_memory(query: str, memory_type: str = "all",
-                         top_k: int = 5) -> ToolChunk:
+                         top_k: int = 5,
+                         scope: str = "all") -> ToolChunk:
     """Search memories using hybrid retrieval (keyword + semantic).
 
     Args:
         query: Search query string.
         memory_type: Filter by type: episodic | semantic | procedural | all.
         top_k: Maximum number of results.
+        scope: Filter by scope: global | session | all.
     """
     yield ToolChunk(
-        content=[TextBlock(text=f"[Tool] Searching memory: '{query}'...")],
+        content=[TextBlock(text=f"[Tool] Searching memory: '{query}' (scope={scope})...")],
         state=ToolResultState.RUNNING,
     )
 
@@ -65,7 +74,10 @@ async def _search_memory(query: str, memory_type: str = "all",
         return
 
     types = None if memory_type == "all" else [memory_type]
-    results = _retriever.search(query, top_k=top_k, memory_types=types)
+    scope_filter = None if scope == "all" else scope
+    results = _retriever.search(
+        query, top_k=top_k, memory_types=types, scope=scope_filter,
+    )
 
     if not results:
         yield ToolChunk(
@@ -89,17 +101,19 @@ async def _search_memory(query: str, memory_type: str = "all",
 
 
 async def _add_memory(content: str, type: str = "semantic",
-                      importance: float = 0.5) -> ToolChunk:
+                      importance: float = 0.5,
+                      scope: str = "global") -> ToolChunk:
     """Add a memory to the store.
 
     Args:
         content: Memory content.
         type: Memory type: episodic | semantic | procedural.
         importance: Importance score 0.0-1.0.
+        scope: 'global' (cross-session) or 'session' (current session only).
     """
     yield ToolChunk(
         content=[TextBlock(
-            text=f"[Tool] Adding {type} memory: '{content[:50]}...'"
+            text=f"[Tool] Adding {type} memory (scope={scope}): '{content[:50]}...'"
         )],
         state=ToolResultState.RUNNING,
     )
@@ -115,23 +129,26 @@ async def _add_memory(content: str, type: str = "semantic",
 
     memory_id = _store.add_memory(
         type=type, content=content, importance=importance,
+        scope=scope, source_session_id=_current_session_id,
     )
 
     yield ToolChunk(
         content=[TextBlock(
             text=f"[ OK ] Memory added (id: {memory_id[:8]}...) "
-                 f"type={type}, importance={importance}"
+                 f"type={type}, scope={scope}, importance={importance}"
         )],
         state=ToolResultState.SUCCESS,
     )
 
 
 async def _list_memories(memory_type: str = "all",
+                         scope: str = "all",
                          limit: int = 20) -> ToolChunk:
     """List memories from the store.
 
     Args:
         memory_type: Filter by type: episodic | semantic | procedural | all.
+        scope: Filter by scope: global | session | all.
         limit: Maximum number of results.
     """
     yield ToolChunk(
@@ -150,6 +167,7 @@ async def _list_memories(memory_type: str = "all",
 
     memories = _store.list_memories(
         type=None if memory_type == "all" else memory_type,
+        scope=None if scope == "all" else scope,
         limit=limit,
     )
 
@@ -214,14 +232,16 @@ async def _forget_memory(memory_id: str) -> ToolChunk:
 
 async def _update_memory(memory_id: str, content: str | None = None,
                          type: str | None = None,
-                         importance: float | None = None) -> ToolChunk:
-    """Update an existing memory's content, type, or importance.
+                         importance: float | None = None,
+                         scope: str | None = None) -> ToolChunk:
+    """Update an existing memory's content, type, importance, or scope.
 
     Args:
         memory_id: ID of the memory to update (use list_memories to find IDs).
         content: New content (optional).
         type: New type: episodic | semantic | procedural (optional).
         importance: New importance score 0.0-1.0 (optional).
+        scope: New scope: global | session (optional).
     """
     yield ToolChunk(
         content=[TextBlock(
@@ -247,11 +267,13 @@ async def _update_memory(memory_id: str, content: str | None = None,
         kwargs["type"] = type
     if importance is not None:
         kwargs["importance"] = importance
+    if scope is not None:
+        kwargs["scope"] = scope
 
     if not kwargs:
         yield ToolChunk(
             content=[TextBlock(
-                text="[FAIL] No fields to update (content, type, or importance required)"
+                text="[FAIL] No fields to update (content, type, importance, or scope required)"
             )],
             state=ToolResultState.ERROR,
         )

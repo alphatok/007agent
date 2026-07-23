@@ -7,13 +7,14 @@ let activeSessionId=null;
 
 input.addEventListener('keydown',e=>{if(e.key==='Enter')send()});
 
-function addMsg(role,text){
+function addMsg(role,text,isHtml){
   const d=document.createElement('div');
   // Map backend "assistant" role to "agent" CSS class
   const cssRole=role==='assistant'?'agent':role;
   d.className='msg '+cssRole;
   const label=role==='user'?'You':'Agent';
-  d.innerHTML='<div class="label">'+label+'</div><div class="content">'+text+'</div>';
+  const content=isHtml?text:escapeHtml(text).replace(/\n/g,'<br>');
+  d.innerHTML='<div class="label">'+label+'</div><div class="content">'+content+'</div>';
   chat.appendChild(d);
   chat.scrollTop=chat.scrollHeight;
   return d;
@@ -148,7 +149,15 @@ async function loadActiveSession(){
 function renderHistory(messages){
   chat.innerHTML='';
   messages.forEach(msg=>{
-    const d=addMsg(msg.role,msg.content);
+    let content,isHtml;
+    if(msg.role==='agent'||msg.role==='assistant'){
+      content=marked.parse(msg.content);
+      isHtml=true;
+    }else{
+      content=msg.content;
+      isHtml=false;
+    }
+    const d=addMsg(msg.role,content,isHtml);
     if(msg.role==='agent'||msg.role==='assistant') detectFiles(msg.content,d.querySelector('.content'));
   });
 }

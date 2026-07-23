@@ -24,6 +24,7 @@ from agentscope.event import EventType
 from agentscope.message import UserMsg
 
 from app.checkpoint import load_checkpoint
+from app.memory_tool import set_current_session_id
 from app.task_manager import TaskManager
 
 if TYPE_CHECKING:
@@ -161,6 +162,9 @@ def create_app(
                 if store:
                     pass  # active_session already written on startup
                 object.__setattr__(agent, "_active_session_id", session_id)
+
+            # Inject current session ID for memory tools
+            set_current_session_id(session_id)
 
             # Persist user message
             if store and session_id:
@@ -595,7 +599,7 @@ def main() -> None:
     from app.agent import build_agent
     from app.config import load_config
     from app.memory import MemoryStore
-    from app.memory_tool import set_memory_store, set_retriever
+    from app.memory_tool import set_memory_store, set_retriever, set_current_session_id
     from app.retriever import HybridRetriever
     from app.store import SessionStore
     from app.tools import build_toolkit
